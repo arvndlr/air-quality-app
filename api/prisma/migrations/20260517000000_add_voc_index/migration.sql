@@ -1,0 +1,2 @@
+ALTER TABLE "Measurement"
+ADD COLUMN "vocIndex" DOUBLE PRECISION;

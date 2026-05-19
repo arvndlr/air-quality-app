@@ -1,0 +1,54 @@
+name: air-quality-app
+region: sgp
+features:
+  - buildpack-stack=ubuntu-22
+alerts:
+  - rule: DEPLOYMENT_FAILED
+  - rule: DOMAIN_FAILED
+services:
+  - name: api
+    git:
+      repo_clone_url: https://github.com/REPLACE_WITH_YOUR_ACCOUNT/REPLACE_WITH_YOUR_REPO.git
+      branch: main
+    source_dir: /api
+    environment_slug: node-js
+    build_command: npm ci && npm run prisma:generate && npm run build
+    run_command: sh -c "npx prisma migrate deploy && npm start"
+    http_port: 4000
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    health_check:
+      http_path: /healthz
+      initial_delay_seconds: 10
+      period_seconds: 10
+      timeout_seconds: 5
+      failure_threshold: 6
+    envs:
+      - key: NODE_ENV
+        value: production
+        scope: RUN_TIME
+      - key: DATABASE_URL
+        value: ${airquality-db.DATABASE_URL}
+        scope: RUN_TIME
+      - key: CORS_ORIGIN
+        value: ${APP_URL}
+        scope: RUN_TIME
+    routes:
+      - path: /api
+        preserve_path_prefix: true
+      - path: /ws
+        preserve_path_prefix: true
+static_sites:
+  - name: web
+    git:
+      repo_clone_url: https://github.com/REPLACE_WITH_YOUR_ACCOUNT/REPLACE_WITH_YOUR_REPO.git
+      branch: main
+    source_dir: /web
+    environment_slug: node-js
+    build_command: npm ci && npm run build
+    output_dir: dist
+    catchall_document: index.html
+databases:
+  - engine: PG
+    name: airquality-db
+    version: "16"

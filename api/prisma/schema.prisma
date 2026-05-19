@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Device {
+  id         String        @id @default(uuid())
+  externalId String        @unique
+  name       String?
+  apiKeyHash String
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  samples    Measurement[]
+
+  @@index([externalId])
+}
+
+model Measurement {
+  id           Int      @id @default(autoincrement())
+  deviceId     String
+  ts           DateTime @db.Timestamptz(6)
+
+  tempC        Float?
+  rh           Float?
+  pressureHpa  Float?
+  gasKohm      Float?
+  vocIndex     Float?
+  batteryVoltage Float?
+  chargerOn    Boolean?
+  uptimeSec    Int?
+  bootCount    Int?
+  resetReason  String?
+  so2Status    String?
+  so2WarmupRemainingSec Int?
+  so2BaselineProgress   Int?
+  so2BaselineTarget     Int?
+
+  co2ppm       Int?
+  scdTempC     Float?
+  scdRh        Float?
+
+  pm1ugm3      Float?
+  pm25ugm3     Float?
+  pm10ugm3     Float?
+
+  so2Vgas      Float?
+  so2Vref      Float?
+  so2Mv        Float?
+
+  micsNh3V     Float?
+  micsCoV      Float?
+  micsNo2V     Float?
+
+  // Estimated concentrations (computed on firmware from raw voltages)
+  so2Ppb       Float?
+  micsCoPpm    Float?
+  micsNo2Ppb   Float?
+  micsNh3Ppm   Float?
+
+  device       Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId, ts(sort: Desc)])
+  @@index([ts(sort: Desc)])
+}

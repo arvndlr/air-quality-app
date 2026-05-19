@@ -1,0 +1,3 @@
+ALTER TABLE "Measurement"
+ADD COLUMN "batteryVoltage" DOUBLE PRECISION,
+ADD COLUMN "chargerOn" BOOLEAN;

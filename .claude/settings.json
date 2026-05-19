@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run:*)",
+      "Bash(powershell.exe -Command \"Stop-Process -Name ''Docker Desktop'' -Force -ErrorAction SilentlyContinue\")",
+      "Bash(powershell.exe -Command \"Start-Process ''C:\\\\Program Files\\\\Docker\\\\Docker\\\\Docker Desktop.exe''\")"
+    ]
+  }
+}

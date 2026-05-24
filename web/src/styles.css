@@ -1,21 +1,24 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap");
 
 :root {
-  color-scheme: dark;
-  --bg: #0d1117;
-  --sidebar-bg: #0f1a2e;
-  --main-bg: #111927;
-  --panel: rgba(255, 255, 255, 0.06);
-  --panel2: rgba(255, 255, 255, 0.09);
-  --text: rgba(255, 255, 255, 0.92);
-  --muted: rgba(255, 255, 255, 0.55);
-  --border: rgba(255, 255, 255, 0.1);
-  --accent: #4ade80;
-  --accent-dim: rgba(74, 222, 128, 0.15);
-  --accent-soft: rgba(125, 249, 171, 0.2);
+  color-scheme: light;
+  --bg: #edf3f7;
+  --sidebar-bg: #f8fbfd;
+  --main-bg: #eef4f8;
+  --panel: #ffffff;
+  --panel2: #f3f7fb;
+  --text: #102233;
+  --muted: #66788a;
+  --border: rgba(15, 23, 42, 0.12);
+  --accent: #14966a;
+  --accent-dim: rgba(20, 150, 106, 0.12);
+  --accent-soft: rgba(20, 150, 106, 0.18);
   --hero-font: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
   --radius: 12px;
   --sidebar-w: 250px;
+  --shadow-soft: 0 16px 40px rgba(15, 23, 42, 0.08);
+  --shadow-card: 0 22px 50px rgba(15, 23, 42, 0.1);
+  --shadow-strong: 0 30px 80px rgba(15, 23, 42, 0.12);
 }
 
 *,
@@ -31,7 +34,7 @@ html, body {
 
 body {
   font-family: "Inter", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-  background: var(--main-bg);
+  background: linear-gradient(180deg, #f8fbfd 0%, var(--main-bg) 100%);
   color: var(--text);
   line-height: 1.5;
 }
@@ -3037,6 +3040,306 @@ select option {
   .auth-card {
     padding: 22px;
   }
+}
+
+/* Light theme overrides */
+.app-main {
+  background: transparent;
+}
+
+.sidebar {
+  box-shadow: 18px 0 42px rgba(15, 23, 42, 0.05);
+}
+
+.sidebar__logo {
+  color: #fff;
+}
+
+.sidebar__link:hover,
+.sidebar__logout:hover {
+  border-color: rgba(20, 150, 106, 0.18);
+  box-shadow: var(--shadow-soft);
+}
+
+.sidebar__link--active {
+  color: #0f7a57;
+  background: var(--accent-dim);
+}
+
+.sidebar__icon {
+  color: rgba(16, 34, 51, 0.42);
+}
+
+.sidebar__logout {
+  border-color: rgba(20, 150, 106, 0.22);
+  background: rgba(20, 150, 106, 0.06);
+}
+
+select {
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+select option {
+  background: #fff;
+  color: var(--text);
+}
+
+.segmented {
+  background: #fff;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.04);
+}
+
+.segmented button[data-active="true"] {
+  color: #0f7a57;
+}
+
+.aqi-hero,
+.chart-panel,
+.pollutant-stat-card,
+.mini-stat,
+.history-summary-card,
+.history-table-panel,
+.report-hero,
+.report-stat-card,
+.report-summary-card,
+.report-meta-card,
+.report-section,
+.pollutant-card,
+.sensor-node-card {
+  box-shadow: var(--shadow-soft);
+}
+
+.chart__empty {
+  border-color: rgba(15, 23, 42, 0.14);
+}
+
+.pollutant-stat-card:hover {
+  border-color: rgba(20, 150, 106, 0.22);
+  box-shadow: var(--shadow-card);
+}
+
+.modal-overlay {
+  background: rgba(226, 232, 240, 0.72);
+}
+
+.modal {
+  background: #fff;
+  box-shadow: var(--shadow-strong);
+}
+
+.error {
+  color: #8a1c1c;
+}
+
+.aqi-table tbody tr {
+  background: #fff;
+}
+
+.aqi-table tbody tr:hover {
+  background: #f7fafc;
+}
+
+.history-overview {
+  background:
+    linear-gradient(180deg, rgba(238, 244, 248, 0.98) 0%, rgba(238, 244, 248, 0.94) 82%, rgba(238, 244, 248, 0) 100%);
+}
+
+.history-status-pill--ready,
+.history-badge--ready,
+.report-status-badge--online {
+  background: rgba(20, 150, 106, 0.12);
+  border-color: rgba(20, 150, 106, 0.2);
+  color: #0f7a57;
+}
+
+.history-status-pill--warming,
+.history-badge--warming {
+  background: rgba(217, 119, 6, 0.12);
+  border-color: rgba(217, 119, 6, 0.18);
+  color: #b45309;
+}
+
+.history-status-pill--calibrating,
+.history-badge--calibrating {
+  background: rgba(2, 132, 199, 0.12);
+  border-color: rgba(2, 132, 199, 0.18);
+  color: #0369a1;
+}
+
+.history-status-pill--unknown,
+.history-badge--unknown {
+  background: rgba(100, 116, 139, 0.12);
+  border-color: rgba(100, 116, 139, 0.16);
+  color: #475569;
+}
+
+.report-status-badge--offline {
+  background: rgba(220, 38, 38, 0.1);
+  color: #b91c1c;
+}
+
+.history-table-wrapper {
+  background: #fff;
+}
+
+.history-table-scroll {
+  scrollbar-color: rgba(102, 120, 138, 0.32) transparent;
+}
+
+.history-table-scroll::-webkit-scrollbar-thumb {
+  background: rgba(102, 120, 138, 0.22);
+}
+
+.history-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(102, 120, 138, 0.32);
+}
+
+.history-table-shadow {
+  background: linear-gradient(180deg, rgba(148, 163, 184, 0.2), rgba(148, 163, 184, 0));
+}
+
+.history-table thead th {
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.history-pagination__button:hover:not(:disabled) {
+  background: #edf5f1;
+  border-color: rgba(20, 150, 106, 0.2);
+}
+
+.report-print-button {
+  color: #0f7a57;
+}
+
+.report-hero__summary {
+  color: #526476;
+}
+
+.sensor-node-card__reading {
+  background: #f4f8fb;
+}
+
+.landing-page,
+.auth-page {
+  background:
+    radial-gradient(circle at top left, rgba(20, 150, 106, 0.12), transparent 34%),
+    radial-gradient(circle at 85% 15%, rgba(14, 165, 233, 0.1), transparent 24%),
+    linear-gradient(180deg, #f8fbfd 0%, #eef4f8 55%, #e7f0f5 100%);
+}
+
+.landing-page__glow,
+.auth-page__mesh {
+  opacity: 0.75;
+}
+
+.auth-page__mesh {
+  background:
+    linear-gradient(rgba(15, 23, 42, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.04) 1px, transparent 1px);
+}
+
+.landing-nav__link,
+.landing-nav__button,
+.landing-brand__text span,
+.landing-hero__body,
+.landing-stat-card p,
+.landing-feature-card p,
+.landing-coverage-panel p,
+.landing-site-card p,
+.landing-telemetry-card__label,
+.auth-panel__copy,
+.auth-highlight,
+.auth-note,
+.auth-card__back,
+.auth-field__label {
+  color: #526476;
+}
+
+.landing-nav__link:hover,
+.auth-card__back:hover {
+  color: var(--text);
+}
+
+.landing-button--secondary,
+.landing-nav__button {
+  background: rgba(255, 255, 255, 0.82);
+  border-color: rgba(15, 23, 42, 0.12);
+  color: var(--text);
+}
+
+.landing-hero__copy,
+.landing-hero__visual,
+.landing-stat-card,
+.landing-feature-card,
+.landing-coverage-panel,
+.landing-site-card,
+.auth-panel,
+.auth-card,
+.landing-telemetry-card {
+  border-color: rgba(15, 23, 42, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(247, 250, 252, 0.94));
+  box-shadow: var(--shadow-strong);
+}
+
+.landing-hero__eyebrow,
+.landing-section__eyebrow,
+.auth-panel__eyebrow,
+.auth-card__eyebrow,
+.landing-coverage-panel__tag {
+  color: #0f7a57;
+}
+
+.signal-orbit__ring {
+  border-color: rgba(20, 150, 106, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.9);
+}
+
+.signal-orbit__core {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(244, 248, 251, 0.92)),
+    #fff;
+  border-color: rgba(20, 150, 106, 0.16);
+  box-shadow: var(--shadow-card);
+}
+
+.landing-telemetry-card__grid div,
+.auth-highlight {
+  background: rgba(244, 248, 251, 0.9);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.landing-coverage-panel::before {
+  background:
+    linear-gradient(rgba(15, 23, 42, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.04) 1px, transparent 1px);
+}
+
+.landing-site-card__index {
+  background: rgba(20, 150, 106, 0.1);
+  color: #0f7a57;
+}
+
+.auth-highlight__dot {
+  box-shadow: 0 0 12px rgba(20, 150, 106, 0.24);
+}
+
+.auth-field input {
+  border-color: rgba(15, 23, 42, 0.1);
+  background: #fff;
+  color: var(--text);
+}
+
+.auth-field input::placeholder {
+  color: #8a99a8;
+}
+
+.auth-field input:focus {
+  background: #fff;
+}
+
+.auth-form__error {
+  color: #8a1c1c;
 }
 
 @media print {

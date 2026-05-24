@@ -172,10 +172,11 @@ function GaugeMeter(props: { value: number; max: number; color: string }) {
   const { value, max, color } = props;
   const pct = Math.min(Math.max(value / max, 0), 1);
   const angle = -90 + pct * 180;
+  const trackColor = "rgba(15, 23, 42, 0.12)";
 
   return (
     <svg viewBox="0 0 120 70" className="gauge">
-      <path d="M 10 65 A 50 50 0 0 1 110 65" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="8" strokeLinecap="round" />
+      <path d="M 10 65 A 50 50 0 0 1 110 65" fill="none" stroke={trackColor} strokeWidth="8" strokeLinecap="round" />
       <path d="M 10 65 A 50 50 0 0 1 110 65" fill="none" stroke={color} strokeWidth="8" strokeLinecap="round" strokeDasharray={`${pct * 157} 157`} />
       <line x1="60" y1="65" x2={60 + 38 * Math.cos((angle * Math.PI) / 180)} y2={65 + 38 * Math.sin((angle * Math.PI) / 180)} stroke={color} strokeWidth="2.5" strokeLinecap="round" />
       <circle cx="60" cy="65" r="4" fill={color} />

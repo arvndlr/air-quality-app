@@ -1,0 +1,84 @@
+<svg width="1440" height="1024" viewBox="0 0 1440 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1440" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F4F8FC"/>
+      <stop offset="1" stop-color="#E3F2F1"/>
+    </linearGradient>
+    <linearGradient id="hero" x1="286" y1="48" x2="1028" y2="310" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#123B67"/>
+      <stop offset="1" stop-color="#0D8A8C"/>
+    </linearGradient>
+  </defs>
+  <rect width="1440" height="1024" fill="url(#bg)"/>
+  <rect x="28" y="24" width="196" height="976" rx="28" fill="#0D223A"/>
+  <text x="60" y="78" fill="#F7FBFF" font-size="30" font-family="Segoe UI, Arial" font-weight="700">SkyLedger</text>
+  <text x="60" y="116" fill="#7FB8D4" font-size="16" font-family="Segoe UI, Arial">Airline Operations Suite</text>
+  <rect x="48" y="164" width="156" height="54" rx="16" fill="#153A60"/>
+  <text x="72" y="198" fill="#F7FBFF" font-size="18" font-family="Segoe UI, Arial">Dashboard</text>
+  <text x="60" y="266" fill="#A8C6D8" font-size="18" font-family="Segoe UI, Arial">Bookings</text>
+  <text x="60" y="316" fill="#A8C6D8" font-size="18" font-family="Segoe UI, Arial">Passengers</text>
+  <text x="60" y="366" fill="#A8C6D8" font-size="18" font-family="Segoe UI, Arial">Tickets</text>
+  <text x="60" y="416" fill="#A8C6D8" font-size="18" font-family="Segoe UI, Arial">Payments</text>
+  <text x="60" y="466" fill="#A8C6D8" font-size="18" font-family="Segoe UI, Arial">Users</text>
+  <text x="60" y="516" fill="#A8C6D8" font-size="18" font-family="Segoe UI, Arial">Reports</text>
+  <rect x="286" y="48" width="1126" height="262" rx="32" fill="url(#hero)"/>
+  <text x="336" y="110" fill="#F6FCFF" font-size="40" font-family="Segoe UI, Arial" font-weight="700">Book, issue, and reconcile from one airline desk</text>
+  <text x="336" y="152" fill="#CDE7EE" font-size="19" font-family="Segoe UI, Arial">A dual-surface platform for customer booking and internal back-office control.</text>
+  <rect x="336" y="190" width="740" height="86" rx="24" fill="#F8FBFD"/>
+  <text x="366" y="224" fill="#65819A" font-size="15" font-family="Segoe UI, Arial">From</text>
+  <text x="366" y="252" fill="#102D4A" font-size="23" font-family="Segoe UI, Arial" font-weight="700">Manila (MNL)</text>
+  <text x="564" y="224" fill="#65819A" font-size="15" font-family="Segoe UI, Arial">To</text>
+  <text x="564" y="252" fill="#102D4A" font-size="23" font-family="Segoe UI, Arial" font-weight="700">Tokyo (NRT)</text>
+  <text x="762" y="224" fill="#65819A" font-size="15" font-family="Segoe UI, Arial">Departure</text>
+  <text x="762" y="252" fill="#102D4A" font-size="23" font-family="Segoe UI, Arial" font-weight="700">Jul 18, 2026</text>
+  <rect x="1054" y="206" width="170" height="52" rx="18" fill="#0D8A8C"/>
+  <text x="1094" y="239" fill="#F8FEFF" font-size="20" font-family="Segoe UI, Arial" font-weight="700">Search Flights</text>
+  <rect x="1240" y="190" width="128" height="86" rx="24" fill="#163653"/>
+  <text x="1270" y="224" fill="#8FD9D9" font-size="14" font-family="Segoe UI, Arial">Issued Today</text>
+  <text x="1274" y="257" fill="#FFFFFF" font-size="34" font-family="Segoe UI, Arial" font-weight="700">186</text>
+  <rect x="286" y="346" width="694" height="292" rx="28" fill="#FFFFFF"/>
+  <text x="326" y="398" fill="#102D4A" font-size="28" font-family="Segoe UI, Arial" font-weight="700">Customer Booking Flow</text>
+  <text x="326" y="432" fill="#647A8F" font-size="17" font-family="Segoe UI, Arial">Premium booking surface with low-friction itinerary selection.</text>
+  <rect x="326" y="468" width="614" height="58" rx="18" fill="#F3F7FA"/>
+  <text x="350" y="504" fill="#102D4A" font-size="18" font-family="Segoe UI, Arial">PR 432  Manila to Tokyo</text>
+  <text x="730" y="504" fill="#0D8A8C" font-size="18" font-family="Segoe UI, Arial" font-weight="700">$428</text>
+  <rect x="326" y="540" width="290" height="68" rx="20" fill="#0F2844"/>
+  <text x="352" y="576" fill="#B9D0DD" font-size="15" font-family="Segoe UI, Arial">Traveler</text>
+  <text x="352" y="600" fill="#FFFFFF" font-size="22" font-family="Segoe UI, Arial" font-weight="700">Ana Santos</text>
+  <rect x="636" y="540" width="304" height="68" rx="20" fill="#DFF3EF"/>
+  <text x="662" y="576" fill="#466875" font-size="15" font-family="Segoe UI, Arial">Payment</text>
+  <text x="662" y="600" fill="#0D8A8C" font-size="22" font-family="Segoe UI, Arial" font-weight="700">Paid via Visa</text>
+  <rect x="1012" y="346" width="400" height="292" rx="28" fill="#FFFFFF"/>
+  <text x="1048" y="398" fill="#102D4A" font-size="28" font-family="Segoe UI, Arial" font-weight="700">Back-Office Snapshot</text>
+  <rect x="1048" y="434" width="136" height="40" rx="14" fill="#E4F5F3"/>
+  <text x="1082" y="460" fill="#0D8A8C" font-size="17" font-family="Segoe UI, Arial" font-weight="700">Queued</text>
+  <rect x="1198" y="434" width="170" height="40" rx="14" fill="#EDF3F8"/>
+  <text x="1234" y="460" fill="#4F6B80" font-size="17" font-family="Segoe UI, Arial">Payment Hold</text>
+  <rect x="1048" y="500" width="324" height="44" rx="14" fill="#F4F8FB"/>
+  <text x="1072" y="528" fill="#15314E" font-size="17" font-family="Segoe UI, Arial">TK-33218  Awaiting issuance</text>
+  <rect x="1048" y="558" width="324" height="44" rx="14" fill="#F4F8FB"/>
+  <text x="1072" y="586" fill="#15314E" font-size="17" font-family="Segoe UI, Arial">TK-33211  Reissue approved</text>
+  <rect x="286" y="676" width="1126" height="298" rx="30" fill="#FFFFFF"/>
+  <text x="326" y="730" fill="#102D4A" font-size="30" font-family="Segoe UI, Arial" font-weight="700">Operations Table</text>
+  <text x="326" y="764" fill="#647A8F" font-size="17" font-family="Segoe UI, Arial">Ticket records, issuance, and payment visibility in one clean operational grid.</text>
+  <rect x="326" y="804" width="1046" height="52" rx="16" fill="#F3F7FA"/>
+  <text x="350" y="836" fill="#5E778C" font-size="16" font-family="Segoe UI, Arial">Record</text>
+  <text x="536" y="836" fill="#5E778C" font-size="16" font-family="Segoe UI, Arial">Passenger</text>
+  <text x="760" y="836" fill="#5E778C" font-size="16" font-family="Segoe UI, Arial">Issue Status</text>
+  <text x="968" y="836" fill="#5E778C" font-size="16" font-family="Segoe UI, Arial">Payment</text>
+  <text x="1172" y="836" fill="#5E778C" font-size="16" font-family="Segoe UI, Arial">Agent</text>
+  <rect x="326" y="870" width="1046" height="40" rx="14" fill="#FFFFFF"/>
+  <text x="350" y="896" fill="#15314E" font-size="16" font-family="Segoe UI, Arial">TK-33218</text>
+  <text x="536" y="896" fill="#15314E" font-size="16" font-family="Segoe UI, Arial">Miguel Cruz</text>
+  <rect x="748" y="878" width="116" height="24" rx="10" fill="#E4F5F3"/>
+  <text x="774" y="895" fill="#0D8A8C" font-size="14" font-family="Segoe UI, Arial" font-weight="700">Queued</text>
+  <text x="968" y="896" fill="#15314E" font-size="16" font-family="Segoe UI, Arial">Cleared</text>
+  <text x="1172" y="896" fill="#15314E" font-size="16" font-family="Segoe UI, Arial">ALM-02</text>
+  <rect x="326" y="920" width="1046" height="40" rx="14" fill="#FFFFFF"/>
+  <text x="350" y="946" fill="#15314E" font-size="16" font-family="Segoe UI, Arial">TK-33211</text>
+  <text x="536" y="946" fill="#15314E" font-size="16" font-family="Segoe UI, Arial">Rina Velasco</text>
+  <rect x="748" y="928" width="116" height="24" rx="10" fill="#E6EEF8"/>
+  <text x="772" y="945" fill="#315F8C" font-size="14" font-family="Segoe UI, Arial" font-weight="700">Issued</text>
+  <text x="968" y="946" fill="#15314E" font-size="16" font-family="Segoe UI, Arial">Refund review</text>
+  <text x="1172" y="946" fill="#15314E" font-size="16" font-family="Segoe UI, Arial">PRM-07</text>
+</svg>

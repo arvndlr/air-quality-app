@@ -127,7 +127,7 @@ static const float BATTERY_FILTER_ALPHA = 0.25f;
 // Example: if the meter says 12.50V and serial says 11.23V, use about 1.11.
 static const float BATTERY_DIVIDER_RATIO = 5.0f;
 static const float BATTERY_ADC_CALIBRATION = 1.00f;
-static const float BATTERY_CHARGER_ON_V = 11.8f;
+static const float BATTERY_CHARGER_ON_V = 9.0f;
 static const float BATTERY_CHARGER_OFF_V = 13.2f;
 static const float VOC_BASELINE_ALPHA_RISE = 0.05f;
 static const float VOC_BASELINE_ALPHA_FALL = 0.005f;
@@ -192,10 +192,10 @@ static float micsNH3_ppm(float vOut) {
 // ~30 nA/ppm sensitivity at 100k TIA gain => 3 mV/ppm => 1 mV ≈ 333 ppb.
 // Vref is still useful for diagnostics, but this firmware captures a clean-air
 // differential baseline after warm-up and estimates concentration from delta signal.
-// Set to 1 for fast bench testing. Use 0 for a production baseline.
+// Set to 1 for a shorter 30-minute bench-test warm-up. Use 0 for a 60-minute production baseline.
 #define SO2_TEST_MODE 0
 
-static const uint32_t SO2_WARMUP_MS = (SO2_TEST_MODE ? 2UL : 120UL) * 60UL * 1000UL;
+static const uint32_t SO2_WARMUP_MS = (SO2_TEST_MODE ? 30UL : 60UL) * 60UL * 1000UL;
 static const uint8_t  SO2_BASELINE_POINTS = 12;   // 12 x 10 s = 2 minutes after warm-up
 static const float    SO2_MV_PER_PPM = 3.0f;
 static const float    SO2_BASELINE_SPAN_LIMIT_MV = 10.0f; // Temporary relaxation for field debugging
@@ -203,6 +203,8 @@ static const float    SO2_ADC_CALIBRATION = 1.00f;
 static const float    SO2_EMA_ALPHA = 0.05f;
 static const int      SO2_FILTER_SAMPLES = 9;
 static const int      SO2_FILTER_DROP = 2;
+static const int      SO2_ADC_DISCARD_SAMPLES = 3;
+static const int      SO2_ADC_SETTLE_US = 300;
 
 RTC_DATA_ATTR static uint32_t rtcBootCount = 0;
 static uint32_t so2BootMs = 0;
@@ -232,6 +234,7 @@ static uint32_t batteryHighSinceMs = 0;
 
 static int analogReadAvgWithSamples(int pin, int sampleCount);
 static int analogReadMilliVoltsAvgWithSamples(int pin, int sampleCount);
+static int analogReadMilliVoltsSettledWithSamples(int pin, int sampleCount, int discardCount, int settleUs);
 
 static const char *resetReasonLabel(esp_reset_reason_t reason) {
   switch (reason) {
@@ -323,9 +326,19 @@ static void readSo2Filtered(float &vgasVolts, float &vrefVolts, float &signalMv)
 
   for (int i = 0; i < SO2_FILTER_SAMPLES; i++) {
     const float vgasMv =
-      (float)analogReadMilliVoltsAvgWithSamples(SO2_VGAS_PIN, ADC_SAMPLES) * SO2_ADC_CALIBRATION;
+      (float)analogReadMilliVoltsSettledWithSamples(
+        SO2_VGAS_PIN,
+        ADC_SAMPLES,
+        SO2_ADC_DISCARD_SAMPLES,
+        SO2_ADC_SETTLE_US
+      ) * SO2_ADC_CALIBRATION;
     const float vrefMv =
-      (float)analogReadMilliVoltsAvgWithSamples(SO2_VREF_PIN, ADC_SAMPLES) * SO2_ADC_CALIBRATION;
+      (float)analogReadMilliVoltsSettledWithSamples(
+        SO2_VREF_PIN,
+        ADC_SAMPLES,
+        SO2_ADC_DISCARD_SAMPLES,
+        SO2_ADC_SETTLE_US
+      ) * SO2_ADC_CALIBRATION;
 
     vgasSamples[i] = vgasMv / 1000.0f;
     vrefSamples[i] = vrefMv / 1000.0f;
@@ -573,6 +586,25 @@ static int analogReadAvgWithSamples(int pin, int sampleCount) {
 static int analogReadMilliVoltsAvgWithSamples(int pin, int sampleCount) {
   long sum = 0;
   for (int i = 0; i < sampleCount; i++) {
+    sum += analogReadMilliVolts(pin);
+  }
+  return (int)(sum / sampleCount);
+}
+
+// High-impedance sources such as ULPSM Vgas/Vref need the ESP32 ADC mux to
+// settle after each channel switch. Discard the first few conversions so the
+// next averaged samples reflect the actual pin voltage instead of the prior pin.
+static int analogReadMilliVoltsSettledWithSamples(int pin, int sampleCount, int discardCount, int settleUs) {
+  if (sampleCount <= 0) return 0;
+
+  for (int i = 0; i < discardCount; i++) {
+    (void)analogReadMilliVolts(pin);
+    if (settleUs > 0) delayMicroseconds(settleUs);
+  }
+
+  long sum = 0;
+  for (int i = 0; i < sampleCount; i++) {
+    if (settleUs > 0) delayMicroseconds(settleUs);
     sum += analogReadMilliVolts(pin);
   }
   return (int)(sum / sampleCount);

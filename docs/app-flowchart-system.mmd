@@ -1,0 +1,29 @@
+flowchart TD
+    A[ESP32 boots] --> B[Initialize sensors and hardware<br/>BME680, SCD40, PM, SO2, MiCS-6814, battery relay]
+    B --> C[Connect Wi-Fi and sync time]
+    C --> D[Warm up and calibrate sensors<br/>MiCS baseline, SO2 warmup/baseline]
+    D --> E[Main loop every 10s]
+
+    E --> F[Read sensors and system state]
+    F --> G[Compute derived values<br/>VOC index, SO2 ppb, CO/NO2/NH3 estimates]
+    G --> H[Build telemetry JSON payload]
+
+    H --> I{Wi-Fi connected?}
+    I -- No --> J[Store payload in offline ring buffer]
+    J --> E
+    I -- Yes --> K[Flush buffered payloads first]
+    K --> L[POST /api/v1/ingest<br/>with X-API-Key]
+
+    L --> M[API validates body with Zod]
+    M --> N[Find device by externalId]
+    N --> O{Device found and API key valid?}
+    O -- No --> P[Return 404 or 401]
+    O -- Yes --> Q[Create Measurement row in PostgreSQL via Prisma]
+    Q --> R[Compute AQI from PM2.5, PM10, CO, NO2, SO2]
+    R --> S[Publish measurement over WebSocket hub]
+    S --> T[Return 201 OK]
+    P --> W[End]
+    T --> W
+
+    S --> U[Dashboard WebSocket clients<br/>/ws?deviceId=... or all]
+    Q --> V[Historical data available to REST endpoints]

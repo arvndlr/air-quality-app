@@ -1,0 +1,29 @@
+flowchart TD
+    A[ESP32 Sensor Node] --> B[Collect air and device readings]
+    B --> C[Send data to API]
+
+    C --> D[API validates request]
+    D --> E[Store reading in PostgreSQL]
+    E --> F[Compute AQI]
+    F --> G[Broadcast live update by WebSocket]
+
+    H[User opens web app] --> I[Landing Page]
+    I --> J[Admin Login]
+    J --> K[Admin Pages]
+
+    K --> L[Dashboard]
+    K --> M[Sensor Nodes]
+    K --> N[Transmission History]
+    K --> O[Admin Reports]
+    K --> P[AQI Info]
+
+    L --> Q[Load latest reading and charts]
+    L --> G
+    M --> R[Load latest reading for each device]
+    N --> S[Load stored transmission history]
+    O --> T[Load report data]
+
+    E --> Q
+    E --> R
+    E --> S
+    E --> T

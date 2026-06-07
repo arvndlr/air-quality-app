@@ -1,0 +1,69 @@
+<svg width="1440" height="1024" viewBox="0 0 1440 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="shell" x1="0" y1="0" x2="1440" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#071522"/>
+      <stop offset="1" stop-color="#123552"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="600" y2="300" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0E2135"/>
+      <stop offset="1" stop-color="#123E5A"/>
+    </linearGradient>
+  </defs>
+  <rect width="1440" height="1024" fill="url(#shell)"/>
+  <rect x="24" y="24" width="1392" height="976" rx="34" fill="#F3F8FB"/>
+  <rect x="24" y="24" width="1392" height="118" rx="34" fill="#0C2033"/>
+  <text x="72" y="92" fill="#FFFFFF" font-size="34" font-family="Segoe UI, Arial" font-weight="700">Control Tower</text>
+  <text x="1120" y="92" fill="#9ED6D8" font-size="18" font-family="Segoe UI, Arial">Ops Health 98.4%</text>
+  <rect x="64" y="178" width="1312" height="190" rx="30" fill="url(#card)"/>
+  <text x="108" y="236" fill="#EAF7FB" font-size="34" font-family="Segoe UI, Arial" font-weight="700">Operations-first airline workspace</text>
+  <text x="108" y="276" fill="#A6C8D6" font-size="18" font-family="Segoe UI, Arial">Best for a back-office-heavy platform where booking, issuance, and payment exceptions are the core workflow.</text>
+  <rect x="108" y="304" width="176" height="36" rx="14" fill="#163D58"/>
+  <text x="138" y="328" fill="#8AE0DF" font-size="16" font-family="Segoe UI, Arial" font-weight="700">Customer Portal Live</text>
+  <rect x="302" y="304" width="190" height="36" rx="14" fill="#163D58"/>
+  <text x="340" y="328" fill="#D6ECF3" font-size="16" font-family="Segoe UI, Arial">11 agents online</text>
+  <rect x="64" y="408" width="276" height="250" rx="28" fill="#FFFFFF"/>
+  <text x="96" y="454" fill="#102D4A" font-size="28" font-family="Segoe UI, Arial" font-weight="700">Customer Search</text>
+  <rect x="96" y="484" width="212" height="46" rx="14" fill="#EFF5F8"/>
+  <text x="118" y="514" fill="#557288" font-size="16" font-family="Segoe UI, Arial">Origin / Destination</text>
+  <rect x="96" y="544" width="100" height="40" rx="12" fill="#E3F3F1"/>
+  <text x="123" y="570" fill="#0D8A8C" font-size="16" font-family="Segoe UI, Arial" font-weight="700">Roundtrip</text>
+  <rect x="96" y="604" width="170" height="40" rx="12" fill="#0D8A8C"/>
+  <text x="135" y="630" fill="#FFFFFF" font-size="17" font-family="Segoe UI, Arial" font-weight="700">Find Flights</text>
+  <rect x="372" y="408" width="664" height="250" rx="28" fill="#FFFFFF"/>
+  <text x="408" y="454" fill="#102D4A" font-size="28" font-family="Segoe UI, Arial" font-weight="700">Ticket Record Command Grid</text>
+  <rect x="408" y="486" width="592" height="42" rx="14" fill="#F2F7FA"/>
+  <text x="430" y="513" fill="#5E778C" font-size="15" font-family="Segoe UI, Arial">PNR</text>
+  <text x="560" y="513" fill="#5E778C" font-size="15" font-family="Segoe UI, Arial">Traveler</text>
+  <text x="768" y="513" fill="#5E778C" font-size="15" font-family="Segoe UI, Arial">Issuance</text>
+  <text x="914" y="513" fill="#5E778C" font-size="15" font-family="Segoe UI, Arial">Payment</text>
+  <rect x="408" y="544" width="592" height="38" rx="12" fill="#FFFFFF"/>
+  <text x="430" y="569" fill="#15314E" font-size="15" font-family="Segoe UI, Arial">RQ72N9</text>
+  <text x="560" y="569" fill="#15314E" font-size="15" font-family="Segoe UI, Arial">Jose Ramos</text>
+  <rect x="748" y="551" width="106" height="22" rx="10" fill="#FFF1D5"/>
+  <text x="770" y="566" fill="#B36B00" font-size="13" font-family="Segoe UI, Arial" font-weight="700">Review</text>
+  <text x="914" y="569" fill="#15314E" font-size="15" font-family="Segoe UI, Arial">Card hold</text>
+  <rect x="408" y="594" width="592" height="38" rx="12" fill="#FFFFFF"/>
+  <text x="430" y="619" fill="#15314E" font-size="15" font-family="Segoe UI, Arial">RX11P4</text>
+  <text x="560" y="619" fill="#15314E" font-size="15" font-family="Segoe UI, Arial">Leah Perez</text>
+  <rect x="748" y="601" width="106" height="22" rx="10" fill="#E3F3F1"/>
+  <text x="770" y="616" fill="#0D8A8C" font-size="13" font-family="Segoe UI, Arial" font-weight="700">Queued</text>
+  <text x="914" y="619" fill="#15314E" font-size="15" font-family="Segoe UI, Arial">Paid</text>
+  <rect x="1068" y="408" width="308" height="250" rx="28" fill="#FFFFFF"/>
+  <text x="1100" y="454" fill="#102D4A" font-size="28" font-family="Segoe UI, Arial" font-weight="700">Issue Queue</text>
+  <rect x="1100" y="492" width="244" height="52" rx="16" fill="#F2F7FA"/>
+  <text x="1122" y="523" fill="#15314E" font-size="16" font-family="Segoe UI, Arial">32 auto-issuance jobs</text>
+  <rect x="1100" y="556" width="244" height="52" rx="16" fill="#F2F7FA"/>
+  <text x="1122" y="587" fill="#15314E" font-size="16" font-family="Segoe UI, Arial">7 manual exceptions</text>
+  <rect x="64" y="694" width="1312" height="250" rx="30" fill="#FFFFFF"/>
+  <text x="100" y="746" fill="#102D4A" font-size="30" font-family="Segoe UI, Arial" font-weight="700">Role and Payment Center</text>
+  <text x="100" y="780" fill="#60788D" font-size="17" font-family="Segoe UI, Arial">User management, cashier activity, and settlement monitoring live in one dense command surface.</text>
+  <rect x="100" y="814" width="320" height="92" rx="22" fill="#0C2033"/>
+  <text x="128" y="850" fill="#8FCFD1" font-size="15" font-family="Segoe UI, Arial">User Administration</text>
+  <text x="128" y="886" fill="#FFFFFF" font-size="26" font-family="Segoe UI, Arial" font-weight="700">3 pending role approvals</text>
+  <rect x="444" y="814" width="420" height="92" rx="22" fill="#E5F3F2"/>
+  <text x="472" y="850" fill="#567286" font-size="15" font-family="Segoe UI, Arial">Payment Reconciliation</text>
+  <text x="472" y="886" fill="#0D8A8C" font-size="26" font-family="Segoe UI, Arial" font-weight="700">$42,180 matched today</text>
+  <rect x="888" y="814" width="452" height="92" rx="22" fill="#F4F7FB"/>
+  <text x="916" y="850" fill="#567286" font-size="15" font-family="Segoe UI, Arial">Audit Trail</text>
+  <text x="916" y="886" fill="#15314E" font-size="26" font-family="Segoe UI, Arial" font-weight="700">117 ticket actions tracked</text>
+</svg>

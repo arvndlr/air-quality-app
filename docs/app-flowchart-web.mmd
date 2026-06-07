@@ -1,0 +1,49 @@
+flowchart TD
+    A[User opens web app] --> B{Route}
+
+    B -->|/| C[Landing Page]
+    C --> D[Admin Login link]
+
+    B -->|/admin/login| E[Admin Login]
+    E --> F{Valid email and password length?}
+    F -- No --> G[Show client-side error]
+    F -- Yes --> H[Save admin session in sessionStorage]
+    H --> I[Redirect to requested /admin route]
+
+    B -->|/admin/*| J[RequireAdminAuth]
+    J --> K{Session exists?}
+    K -- No --> E
+    K -- Yes --> L[AdminLayout + Sidebar]
+
+    L --> M[AQI Dashboard]
+    L --> N[Sensor Nodes]
+    L --> O[Pollutant Info]
+    L --> P[Transmission History]
+    L --> Q[Admin Reports]
+    L --> R[Placeholder pages<br/>FAQs, About, Terms, Settings]
+
+    M --> M1[listDevices]
+    M --> M2[getLatest for selected device]
+    M --> M3[getSeries for selected metric/range]
+    M --> M4[Open WebSocket for selected device]
+    M4 --> M5[On live measurement message<br/>update latest reading and AQI card]
+
+    N --> N1[listDevices]
+    N1 --> N2[getLatest for each device]
+
+    O --> O1[Static AQI and pollutant guidance content]
+
+    P --> P1[listDevices]
+    P --> P2[getTransmissionHistory<br/>device/range/status/page filters]
+
+    Q --> Q1[listDevices]
+    Q --> Q2[getTransmissionHistory<br/>for report window]
+    Q --> Q3[getLatest for selected/all devices]
+    Q --> Q4[window.print for printable report]
+    R --> Z[End]
+    O1 --> Z
+    P2 --> Z
+    Q4 --> Z
+    M5 --> Z
+    N2 --> Z
+    I --> Z

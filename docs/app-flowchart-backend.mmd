@@ -1,0 +1,17 @@
+flowchart LR
+    A[Web UI] --> B[GET /api/v1/devices]
+    A --> C[GET /api/v1/latest?deviceId=...]
+    A --> D[GET /api/v1/series?deviceId=...&metric=...&from=...&to=...&bucket=...]
+    A --> E[GET /api/v1/transmissions?deviceId=...&from=...&to=...&status=...&page=...]
+
+    B --> F[(Device table)]
+    C --> G[(Measurement table)]
+    D --> G
+    E --> G
+
+    C --> H[computeAqi on latest sample]
+    D --> I[Aggregate by time bucket]
+    E --> J[Compute summary, status counts,<br/>cadence, pagination]
+    H --> K[End]
+    I --> K
+    J --> K

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { format, formatDistanceToNowStrict, formatISO, subDays, subMonths, subWeeks } from "date-fns";
+import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { getBatteryStatus } from "../battery";
 import {
   getLatest,
@@ -65,6 +66,8 @@ function formatAqi(aqi: AqiResult | null) {
   return `${aqi.aqi} • ${aqi.category}`;
 }
 
+type ChartType = "bar" | "pie" | "table";
+
 export function AdminReports() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [deviceId, setDeviceId] = useState<string>("");
@@ -73,6 +76,11 @@ export function AdminReports() {
   const [snapshots, setSnapshots] = useState<DeviceSnapshot[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [chartTypes, setChartTypes] = useState<Record<string, ChartType>>({
+    so2Status: "bar",
+    deviceAvailability: "pie",
+    transmissions: "bar"
+  });
 
   const timeWindow = useMemo(() => computeWindow(range), [range]);
   const selectedDevice = devices.find((device) => device.externalId === deviceId) ?? null;
@@ -154,8 +162,123 @@ export function AdminReports() {
   const warmingCount = snapshots.filter((snapshot) => getSo2StatusSummary(snapshot.latest).label === "Warming").length;
   const calibratingCount = snapshots.filter((snapshot) => getSo2StatusSummary(snapshot.latest).label === "Calibrating").length;
 
+  // Aggregate pollutant data by device
+  const pollutantByDevice = useMemo(() => {
+    if (!history) return [];
+
+    const deviceData: Record<string, {
+      pm25: number[];
+      pm10: number[];
+      so2: number[];
+      co: number[];
+      voc: number[];
+    }> = {};
+
+    history.rows.forEach((row) => {
+      const deviceKey = row.deviceName || row.deviceExternalId;
+      if (!deviceData[deviceKey]) {
+        deviceData[deviceKey] = { pm25: [], pm10: [], so2: [], co: [], voc: [] };
+      }
+      if (row.pm25ugm3 != null) deviceData[deviceKey].pm25.push(row.pm25ugm3);
+      if (row.pm10ugm3 != null) deviceData[deviceKey].pm10.push(row.pm10ugm3);
+      if (row.so2Ppb != null) deviceData[deviceKey].so2.push(row.so2Ppb);
+      if (row.micsCoPpm != null) deviceData[deviceKey].co.push(row.micsCoPpm);
+      if (row.vocIndex != null) deviceData[deviceKey].voc.push(row.vocIndex);
+    });
+
+    // Calculate averages
+    const result: any[] = [];
+    Object.entries(deviceData).forEach(([device, data]) => {
+      result.push({
+        device: device.substring(0, 15),
+        pm25: data.pm25.length > 0 ? Math.round((data.pm25.reduce((a, b) => a + b) / data.pm25.length) * 10) / 10 : 0,
+        pm10: data.pm10.length > 0 ? Math.round((data.pm10.reduce((a, b) => a + b) / data.pm10.length) * 10) / 10 : 0,
+        so2: data.so2.length > 0 ? Math.round((data.so2.reduce((a, b) => a + b) / data.so2.length) * 10) / 10 : 0,
+        co: data.co.length > 0 ? Math.round((data.co.reduce((a, b) => a + b) / data.co.length) * 10) / 10 : 0,
+        voc: data.voc.length > 0 ? Math.round((data.voc.reduce((a, b) => a + b) / data.voc.length) * 10) / 10 : 0
+      });
+    });
+
+    return result;
+  }, [history]);
+
   function handlePrint() {
     window.print();
+  }
+
+  function toggleChartType(metricKey: string, nextType: ChartType) {
+    setChartTypes((prev) => ({
+      ...prev,
+      [metricKey]: nextType
+    }));
+  }
+
+  function renderChart(metricKey: string, data: any[], dataKey: string, title: string, colors?: string[]) {
+    const chartType = chartTypes[metricKey] || "bar";
+    const defaultColors = colors || ["#3b82f6", "#10b981", "#f59e0b", "#ef4444"];
+    const xAxisKey = data.length > 0 && data[0].device ? "device" : "name";
+
+    return (
+      <div style={{ background: "var(--surface)", padding: "1.5rem", borderRadius: "8px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+          <h3 style={{ fontSize: "0.9rem", fontWeight: 600, textTransform: "uppercase", color: "var(--text-secondary)", margin: 0 }}>
+            {title}
+          </h3>
+          <div className="segmented" role="group" style={{ fontSize: "0.8rem" }}>
+            <button
+              type="button"
+              data-active={chartType === "bar"}
+              onClick={() => toggleChartType(metricKey, "bar")}
+              style={{ padding: "0.4rem 0.8rem" }}
+            >
+              Bar
+            </button>
+            <button
+              type="button"
+              data-active={chartType === "pie"}
+              onClick={() => toggleChartType(metricKey, "pie")}
+              style={{ padding: "0.4rem 0.8rem" }}
+            >
+              Pie
+            </button>
+          </div>
+        </div>
+
+        {chartType === "bar" && (
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={data}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey={xAxisKey} />
+              <YAxis />
+              <Tooltip />
+              <Bar dataKey={dataKey} fill={defaultColors[0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+
+        {chartType === "pie" && (
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={data}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                label={({ [xAxisKey]: name, [dataKey]: value }) => `${name}: ${value}`}
+                outerRadius={80}
+                fill="#8884d8"
+                dataKey={dataKey}
+              >
+                {data.map((_, index) => (
+                  <Cell key={`cell-${index}`} fill={defaultColors[index % defaultColors.length]} />
+                ))}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    );
   }
 
   const sortedSnapshots = [...snapshots].sort((left, right) => {
@@ -290,6 +413,63 @@ export function AdminReports() {
                 <p>Most recent stored transmission occurred at {formatDateTime(history.summary.latestTs)}.</p>
               </div>
             </div>
+          </section>
+
+          <section className="dashboard-section report-section">
+            <div className="dashboard-section__header">
+              <div>
+                <h2 className="dashboard-section__title">Pollutant Analysis</h2>
+                <span className="dashboard-section__hint">Average pollutant concentrations across all devices in the reporting window.</span>
+              </div>
+            </div>
+
+            {pollutantByDevice.length === 0 ? (
+              <div className="chart__empty" style={{ height: 220 }}>
+                No pollutant data available for this report window.
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(500px, 1fr))", gap: "2rem", marginTop: "2rem" }}>
+                {renderChart(
+                  "pm25",
+                  pollutantByDevice,
+                  "pm25",
+                  "PM2.5 (µg/m³) - Particulate Matter",
+                  ["#ef4444"]
+                )}
+
+                {renderChart(
+                  "pm10",
+                  pollutantByDevice,
+                  "pm10",
+                  "PM10 (µg/m³) - Particulate Matter",
+                  ["#f97316"]
+                )}
+
+                {renderChart(
+                  "so2",
+                  pollutantByDevice,
+                  "so2",
+                  "SO2 (ppb) - Sulfur Dioxide",
+                  ["#f59e0b"]
+                )}
+
+                {renderChart(
+                  "co",
+                  pollutantByDevice,
+                  "co",
+                  "CO (ppm) - Carbon Monoxide",
+                  ["#8b5cf6"]
+                )}
+
+                {renderChart(
+                  "voc",
+                  pollutantByDevice,
+                  "voc",
+                  "VOC (index) - Volatile Organic Compounds",
+                  ["#06b6d4"]
+                )}
+              </div>
+            )}
           </section>
 
           <section className="dashboard-section report-section">

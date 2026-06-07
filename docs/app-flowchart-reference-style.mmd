@@ -1,0 +1,47 @@
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Arial",
+    "fontSize": "18px",
+    "primaryColor": "#ffffff",
+    "primaryTextColor": "#111111",
+    "primaryBorderColor": "#111111",
+    "lineColor": "#111111",
+    "secondaryColor": "#ffffff",
+    "secondaryTextColor": "#111111",
+    "secondaryBorderColor": "#111111",
+    "tertiaryColor": "#ffffff",
+    "tertiaryTextColor": "#111111",
+    "tertiaryBorderColor": "#111111",
+    "clusterBkg": "#ffffff",
+    "clusterBorder": "#ffffff"
+  },
+  "flowchart": {
+    "curve": "linear",
+    "nodeSpacing": 40,
+    "rankSpacing": 45,
+    "htmlLabels": true
+  }
+}}%%
+
+flowchart TD
+    A([START]) --> B[/ESP32 reads air sensors<br/>and device status/]
+    B --> C[Create telemetry JSON payload]
+    C --> D{Wi-Fi connected?}
+
+    D -- No --> E[Keep payload in local buffer<br/>and try again later]
+    E --> M([END])
+
+    D -- Yes --> F[/Send data to API with<br/>device ID and API key/]
+    F --> G{API request valid?}
+
+    G -- No --> H[Reject request]
+    H --> M
+
+    G -- Yes --> I[Store measurement in<br/>PostgreSQL database]
+    I --> J[Compute AQI from the<br/>latest pollutant values]
+    J --> K[Send live update through<br/>WebSocket]
+    K --> L[/Dashboard, history, and reports<br/>show the updated data/]
+    L --> M
+
+    classDef default fill:#ffffff,stroke:#111111,stroke-width:1.5px,color:#111111;

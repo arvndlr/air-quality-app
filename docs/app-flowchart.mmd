@@ -1,0 +1,99 @@
+flowchart TD
+    subgraph FW[ESP32 Firmware]
+        A[ESP32 boots]
+        B[Initialize sensors and hardware<br/>BME680, SCD40, PM, SO2, MiCS-6814, battery relay]
+        C[Connect Wi-Fi and sync time]
+        D[Warm up and calibrate sensors<br/>MiCS baseline, SO2 warmup and baseline]
+        E[Main loop every 10 seconds]
+        F[Read sensors and system state]
+        G[Compute derived values<br/>VOC index, SO2 ppb, CO, NO2, NH3 estimates]
+        H[Build telemetry JSON payload]
+        I{Wi-Fi connected?}
+        J[Buffer payload locally]
+        K[Flush buffered payloads]
+        L[POST /api/v1/ingest<br/>with X-API-Key]
+
+        A --> B --> C --> D --> E --> F --> G --> H --> I
+        I -- No --> J --> E
+        I -- Yes --> K --> L
+    end
+
+    subgraph API[Node/Express API]
+        M[Validate request body with Zod]
+        N[Find device by externalId]
+        O{Device found and API key valid?}
+        P[Return 404 or 401]
+        Q[Store measurement in PostgreSQL via Prisma]
+        R[Compute AQI from PM2.5, PM10, CO, NO2, SO2]
+        S[Publish measurement via WebSocket hub]
+        T[Return 201 OK]
+
+        L --> M --> N --> O
+        O -- No --> P
+        O -- Yes --> Q --> R --> S --> T
+    end
+
+    subgraph DB[PostgreSQL]
+        U[(Device table)]
+        V[(Measurement table)]
+    end
+
+    N --> U
+    Q --> V
+
+    subgraph WEB[React Web App]
+        W[User opens app]
+        X{Route}
+        Y[Landing page]
+        Z[Admin login]
+        AA{Session exists?}
+        AB[Admin layout and sidebar]
+        AC[AQI Dashboard]
+        AD[Sensor Nodes]
+        AE[Pollutant Info]
+        AF[Transmission History]
+        AG[Admin Reports]
+
+        AH[listDevices]
+        AI[getLatest]
+        AJ[getSeries]
+        AK[Open WebSocket for selected device]
+        AL[Update latest reading and AQI live]
+        AM[getLatest for each device]
+        AN[getTransmissionHistory]
+        AO[getTransmissionHistory plus getLatest]
+
+        W --> X
+        X -->|/| Y
+        Y --> Z
+        X -->|/admin/login| Z
+        X -->|/admin/*| AA
+        Z --> AA
+        AA -- No --> Z
+        AA -- Yes --> AB
+        AB --> AC
+        AB --> AD
+        AB --> AE
+        AB --> AF
+        AB --> AG
+
+        AC --> AH
+        AC --> AI
+        AC --> AJ
+        AC --> AK --> AL
+        AD --> AH
+        AD --> AM
+        AE --> AP[Static AQI guidance content]
+        AF --> AH
+        AF --> AN
+        AG --> AH
+        AG --> AO
+        AG --> AQ[Printable report]
+    end
+
+    AH --> U
+    AI --> V
+    AJ --> V
+    AN --> V
+    AO --> V
+    S --> AK

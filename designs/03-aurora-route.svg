@@ -1,0 +1,67 @@
+<svg width="1440" height="1024" viewBox="0 0 1440 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="page" x1="0" y1="0" x2="1440" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF9F2"/>
+      <stop offset="1" stop-color="#EAF4FB"/>
+    </linearGradient>
+    <linearGradient id="banner" x1="0" y1="0" x2="880" y2="300" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0D3050"/>
+      <stop offset="1" stop-color="#167C90"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="320" y2="200" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFBE6B"/>
+      <stop offset="1" stop-color="#F17F4D"/>
+    </linearGradient>
+  </defs>
+  <rect width="1440" height="1024" fill="url(#page)"/>
+  <rect x="38" y="34" width="1364" height="956" rx="34" fill="#FFFFFF"/>
+  <rect x="38" y="34" width="860" height="956" rx="34" fill="#FBFDFC"/>
+  <rect x="78" y="72" width="780" height="320" rx="34" fill="url(#banner)"/>
+  <text x="128" y="140" fill="#FFFFFF" font-size="40" font-family="Segoe UI, Arial" font-weight="700">Aurora Route</text>
+  <text x="128" y="188" fill="#D7EBF0" font-size="22" font-family="Segoe UI, Arial">A premium booking-led experience with a lighter executive admin panel.</text>
+  <rect x="128" y="230" width="680" height="104" rx="28" fill="#F8FBFD"/>
+  <text x="160" y="270" fill="#6B8598" font-size="16" font-family="Segoe UI, Arial">Search itinerary</text>
+  <text x="160" y="308" fill="#0F2844" font-size="30" font-family="Segoe UI, Arial" font-weight="700">Manila to Singapore, 2 Adults, Jul 18</text>
+  <rect x="638" y="248" width="138" height="52" rx="18" fill="url(#accent)"/>
+  <text x="674" y="282" fill="#FFFFFF" font-size="18" font-family="Segoe UI, Arial" font-weight="700">Search</text>
+  <rect x="128" y="432" width="350" height="196" rx="28" fill="#FFFFFF"/>
+  <text x="160" y="480" fill="#102D4A" font-size="28" font-family="Segoe UI, Arial" font-weight="700">Login</text>
+  <rect x="160" y="506" width="286" height="46" rx="14" fill="#F2F7FA"/>
+  <text x="182" y="536" fill="#698195" font-size="16" font-family="Segoe UI, Arial">Email address</text>
+  <rect x="160" y="564" width="286" height="46" rx="14" fill="#F2F7FA"/>
+  <text x="182" y="594" fill="#698195" font-size="16" font-family="Segoe UI, Arial">Password</text>
+  <rect x="160" y="626" width="164" height="42" rx="14" fill="#0D3050"/>
+  <text x="202" y="653" fill="#FFFFFF" font-size="17" font-family="Segoe UI, Arial" font-weight="700">Sign In</text>
+  <rect x="508" y="432" width="300" height="196" rx="28" fill="#FFF6EA"/>
+  <text x="540" y="480" fill="#A65B19" font-size="16" font-family="Segoe UI, Arial">Featured Fare</text>
+  <text x="540" y="526" fill="#102D4A" font-size="30" font-family="Segoe UI, Arial" font-weight="700">$312 Saver Plus</text>
+  <text x="540" y="560" fill="#5E778C" font-size="16" font-family="Segoe UI, Arial">Includes 20kg baggage, seat selection, and mobile check-in.</text>
+  <rect x="78" y="668" width="780" height="268" rx="28" fill="#FFFFFF"/>
+  <text x="120" y="720" fill="#102D4A" font-size="30" font-family="Segoe UI, Arial" font-weight="700">Ticket Issuance and Payment</text>
+  <rect x="120" y="756" width="698" height="56" rx="18" fill="#F3F7FA"/>
+  <text x="146" y="792" fill="#15314E" font-size="18" font-family="Segoe UI, Arial">PNR RX11P4  Issuance status: Ready</text>
+  <rect x="120" y="828" width="240" height="64" rx="20" fill="#0D8A8C"/>
+  <text x="148" y="868" fill="#FFFFFF" font-size="21" font-family="Segoe UI, Arial" font-weight="700">Issue Ticket</text>
+  <rect x="380" y="828" width="220" height="64" rx="20" fill="#FFF4E6"/>
+  <text x="408" y="868" fill="#A65B19" font-size="21" font-family="Segoe UI, Arial" font-weight="700">Capture Payment</text>
+  <rect x="920" y="34" width="482" height="956" rx="34" fill="#0E2237"/>
+  <text x="966" y="98" fill="#FFFFFF" font-size="34" font-family="Segoe UI, Arial" font-weight="700">Executive Admin Rail</text>
+  <text x="966" y="134" fill="#8EBFC9" font-size="17" font-family="Segoe UI, Arial">A quieter panel for supervisors, records, and access control.</text>
+  <rect x="966" y="176" width="390" height="98" rx="24" fill="#12324E"/>
+  <text x="996" y="214" fill="#8FD9D9" font-size="15" font-family="Segoe UI, Arial">User Management</text>
+  <text x="996" y="248" fill="#FFFFFF" font-size="24" font-family="Segoe UI, Arial" font-weight="700">12 active agents, 2 locked accounts</text>
+  <rect x="966" y="296" width="390" height="220" rx="24" fill="#12324E"/>
+  <text x="996" y="336" fill="#FFFFFF" font-size="26" font-family="Segoe UI, Arial" font-weight="700">Record Monitor</text>
+  <rect x="996" y="362" width="330" height="44" rx="14" fill="#193D5C"/>
+  <text x="1020" y="390" fill="#DCEBF3" font-size="16" font-family="Segoe UI, Arial">RQ72N9  Pending review</text>
+  <rect x="996" y="420" width="330" height="44" rx="14" fill="#193D5C"/>
+  <text x="1020" y="448" fill="#DCEBF3" font-size="16" font-family="Segoe UI, Arial">TX81V2  Paid, awaiting issue</text>
+  <rect x="966" y="538" width="390" height="184" rx="24" fill="#12324E"/>
+  <text x="996" y="578" fill="#FFFFFF" font-size="26" font-family="Segoe UI, Arial" font-weight="700">Finance Snapshot</text>
+  <text x="996" y="618" fill="#8EBFC9" font-size="16" font-family="Segoe UI, Arial">Daily capture</text>
+  <text x="996" y="662" fill="#FFFFFF" font-size="36" font-family="Segoe UI, Arial" font-weight="700">$58,940</text>
+  <rect x="966" y="746" width="390" height="170" rx="24" fill="#FFF8EE"/>
+  <text x="996" y="790" fill="#A65B19" font-size="16" font-family="Segoe UI, Arial">Approvals</text>
+  <text x="996" y="832" fill="#102D4A" font-size="28" font-family="Segoe UI, Arial" font-weight="700">4 refunds need supervisor action</text>
+  <text x="996" y="872" fill="#5E778C" font-size="16" font-family="Segoe UI, Arial">Ideal if the system needs a more polished booking face than a dense ops dashboard.</text>
+</svg>

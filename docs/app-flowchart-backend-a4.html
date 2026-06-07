@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Backend Read Endpoints - A4</title>
+  <style>
+    @page {
+      size: A4 landscape;
+      margin: 0;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #eef2f7;
+      font-family: Arial, sans-serif;
+    }
+
+    .page {
+      width: 297mm;
+      height: 210mm;
+      margin: 0 auto;
+      padding: 12mm;
+      background: #fff;
+      color: #14213d;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 5mm;
+    }
+
+    .header {
+      border-bottom: 1px solid #d8e0ea;
+      padding-bottom: 3mm;
+    }
+
+    .title {
+      margin: 0;
+      font-size: 15pt;
+      line-height: 1.1;
+    }
+
+    .subtitle {
+      margin: 1mm 0 0;
+      font-size: 8.5pt;
+      color: #56657d;
+    }
+
+    .panel {
+      border: 1px solid #d8e0ea;
+      border-radius: 10px;
+      background: #fbfcfe;
+      padding: 5mm;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 4mm;
+      overflow: hidden;
+    }
+
+    .panel h2 {
+      margin: 0;
+      font-size: 10pt;
+      color: #17345d;
+    }
+
+    .diagram {
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .diagram img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="header">
+      <h1 class="title">Air Quality App Flowchart</h1>
+      <p class="subtitle">Page 3 of 3. Based on <code>docs/app-flowchart.md</code>.</p>
+    </header>
+    <section class="panel">
+      <h2>3. Backend Read Endpoints Used by the Web App</h2>
+      <div class="diagram">
+        <img alt="Backend read endpoints flowchart" src="app-flowchart-backend.svg">
+      </div>
+    </section>
+  </main>
+</body>
+</html>

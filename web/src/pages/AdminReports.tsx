@@ -77,9 +77,8 @@ export function AdminReports() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [chartTypes, setChartTypes] = useState<Record<string, ChartType>>({
-    so2Status: "bar",
-    deviceAvailability: "pie",
-    transmissions: "bar"
+    pollutants: "bar",
+    pollutantTotal: "pie"
   });
 
   const timeWindow = useMemo(() => computeWindow(range), [range]);
@@ -186,21 +185,50 @@ export function AdminReports() {
       if (row.vocIndex != null) deviceData[deviceKey].voc.push(row.vocIndex);
     });
 
-    // Calculate averages
+    // Calculate averages per device with all pollutants
     const result: any[] = [];
     Object.entries(deviceData).forEach(([device, data]) => {
       result.push({
         device: device.substring(0, 15),
-        pm25: data.pm25.length > 0 ? Math.round((data.pm25.reduce((a, b) => a + b) / data.pm25.length) * 10) / 10 : 0,
-        pm10: data.pm10.length > 0 ? Math.round((data.pm10.reduce((a, b) => a + b) / data.pm10.length) * 10) / 10 : 0,
-        so2: data.so2.length > 0 ? Math.round((data.so2.reduce((a, b) => a + b) / data.so2.length) * 10) / 10 : 0,
-        co: data.co.length > 0 ? Math.round((data.co.reduce((a, b) => a + b) / data.co.length) * 10) / 10 : 0,
-        voc: data.voc.length > 0 ? Math.round((data.voc.reduce((a, b) => a + b) / data.voc.length) * 10) / 10 : 0
+        PM25: data.pm25.length > 0 ? Math.round((data.pm25.reduce((a, b) => a + b) / data.pm25.length) * 10) / 10 : 0,
+        PM10: data.pm10.length > 0 ? Math.round((data.pm10.reduce((a, b) => a + b) / data.pm10.length) * 10) / 10 : 0,
+        SO2: data.so2.length > 0 ? Math.round((data.so2.reduce((a, b) => a + b) / data.so2.length) * 10) / 10 : 0,
+        CO: data.co.length > 0 ? Math.round((data.co.reduce((a, b) => a + b) / data.co.length) * 10) / 10 : 0,
+        VOC: data.voc.length > 0 ? Math.round((data.voc.reduce((a, b) => a + b) / data.voc.length) * 10) / 10 : 0
       });
     });
 
     return result;
   }, [history]);
+
+  // Aggregate total pollutant distribution
+  const pollutantDistribution = useMemo(() => {
+    if (pollutantByDevice.length === 0) return [];
+
+    const totals = {
+      pm25: 0,
+      pm10: 0,
+      so2: 0,
+      co: 0,
+      voc: 0
+    };
+
+    pollutantByDevice.forEach((device) => {
+      totals.pm25 += device.PM25;
+      totals.pm10 += device.PM10;
+      totals.so2 += device.SO2;
+      totals.co += device.CO;
+      totals.voc += device.VOC;
+    });
+
+    return [
+      { name: "PM2.5", value: Math.round(totals.pm25 * 10) / 10 },
+      { name: "PM10", value: Math.round(totals.pm10 * 10) / 10 },
+      { name: "SO2", value: Math.round(totals.so2 * 10) / 10 },
+      { name: "CO", value: Math.round(totals.co * 10) / 10 },
+      { name: "VOC", value: Math.round(totals.voc * 10) / 10 }
+    ];
+  }, [pollutantByDevice]);
 
   function handlePrint() {
     window.print();
@@ -213,10 +241,11 @@ export function AdminReports() {
     }));
   }
 
-  function renderChart(metricKey: string, data: any[], dataKey: string, title: string, colors?: string[]) {
+  function renderChart(metricKey: string, data: any[], dataKey: string | string[], title: string, colors?: string[]) {
     const chartType = chartTypes[metricKey] || "bar";
     const defaultColors = colors || ["#3b82f6", "#10b981", "#f59e0b", "#ef4444"];
     const xAxisKey = data.length > 0 && data[0].device ? "device" : "name";
+    const isMultiSeries = Array.isArray(dataKey);
 
     return (
       <div style={{ background: "var(--surface)", padding: "1.5rem", borderRadius: "8px" }}>
@@ -251,7 +280,13 @@ export function AdminReports() {
               <XAxis dataKey={xAxisKey} />
               <YAxis />
               <Tooltip />
-              <Bar dataKey={dataKey} fill={defaultColors[0]} />
+              {isMultiSeries ? (
+                (dataKey as string[]).map((key: string, index: number) => (
+                  <Bar key={key} dataKey={key} fill={defaultColors[index % defaultColors.length]} />
+                ))
+              ) : (
+                <Bar dataKey={dataKey as string} fill={defaultColors[0]} />
+              )}
             </BarChart>
           </ResponsiveContainer>
         )}
@@ -264,10 +299,10 @@ export function AdminReports() {
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ [xAxisKey]: name, [dataKey]: value }) => `${name}: ${value}`}
+                label={({ [xAxisKey]: name, [isMultiSeries ? "value" : dataKey]: val }) => `${name}: ${val}`}
                 outerRadius={80}
                 fill="#8884d8"
-                dataKey={dataKey}
+                dataKey={isMultiSeries ? "value" : (dataKey as string)}
               >
                 {data.map((_, index) => (
                   <Cell key={`cell-${index}`} fill={defaultColors[index % defaultColors.length]} />
@@ -428,45 +463,21 @@ export function AdminReports() {
                 No pollutant data available for this report window.
               </div>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(500px, 1fr))", gap: "2rem", marginTop: "2rem" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(600px, 1fr))", gap: "2rem", marginTop: "2rem" }}>
                 {renderChart(
-                  "pm25",
+                  "pollutants",
                   pollutantByDevice,
-                  "pm25",
-                  "PM2.5 (µg/m³) - Particulate Matter",
-                  ["#ef4444"]
+                  ["PM25", "PM10", "SO2", "CO", "VOC"],
+                  "Pollutant Distribution by Device",
+                  ["#ef4444", "#f97316", "#f59e0b", "#8b5cf6", "#06b6d4"]
                 )}
 
                 {renderChart(
-                  "pm10",
-                  pollutantByDevice,
-                  "pm10",
-                  "PM10 (µg/m³) - Particulate Matter",
-                  ["#f97316"]
-                )}
-
-                {renderChart(
-                  "so2",
-                  pollutantByDevice,
-                  "so2",
-                  "SO2 (ppb) - Sulfur Dioxide",
-                  ["#f59e0b"]
-                )}
-
-                {renderChart(
-                  "co",
-                  pollutantByDevice,
-                  "co",
-                  "CO (ppm) - Carbon Monoxide",
-                  ["#8b5cf6"]
-                )}
-
-                {renderChart(
-                  "voc",
-                  pollutantByDevice,
-                  "voc",
-                  "VOC (index) - Volatile Organic Compounds",
-                  ["#06b6d4"]
+                  "pollutantTotal",
+                  pollutantDistribution,
+                  "value",
+                  "Overall Pollutant Distribution",
+                  ["#ef4444", "#f97316", "#f59e0b", "#8b5cf6", "#06b6d4"]
                 )}
               </div>
             )}

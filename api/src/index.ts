@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import { createServer } from "http";
-import { WebSocketServer } from "ws";
+import { WebSocketServer, type WebSocket } from "ws";
 import { ZodError } from "zod";
 import { env } from "./env.js";
 import { WsHub } from "./ws-hub.js";
@@ -37,14 +37,40 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
 const server = createServer(app);
 
 const wss = new WebSocketServer({ server, path: "/ws" });
+type HeartbeatSocket = WebSocket & { isAlive?: boolean };
+
 wss.on("connection", (ws, req) => {
+  const heartbeatWs = ws as HeartbeatSocket;
   const url = new URL(req.url ?? "", `http://${req.headers.host}`);
   const deviceExternalId = url.searchParams.get("deviceId") ?? "all";
 
-  hub.addClient({ ws, deviceExternalId });
+  heartbeatWs.isAlive = true;
+  heartbeatWs.on("pong", () => {
+    heartbeatWs.isAlive = true;
+  });
 
-  ws.on("close", () => hub.removeClient(ws));
-  ws.on("error", () => hub.removeClient(ws));
+  hub.addClient({ ws: heartbeatWs, deviceExternalId });
+
+  heartbeatWs.on("close", () => hub.removeClient(heartbeatWs));
+  heartbeatWs.on("error", () => hub.removeClient(heartbeatWs));
+});
+
+const heartbeatTimer = setInterval(() => {
+  for (const ws of wss.clients) {
+    const heartbeatWs = ws as HeartbeatSocket;
+    if (heartbeatWs.isAlive === false) {
+      hub.removeClient(heartbeatWs);
+      heartbeatWs.terminate();
+      continue;
+    }
+
+    heartbeatWs.isAlive = false;
+    heartbeatWs.ping();
+  }
+}, 30000);
+
+wss.on("close", () => {
+  clearInterval(heartbeatTimer);
 });
 
 server.listen(env.PORT, () => {

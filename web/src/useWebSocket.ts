@@ -1,38 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { resolveWebSocketUrl } from "./runtimeUrls";
 
 type WsMessage = unknown;
-
-function resolveWebSocketUrl(deviceId: string) {
-  const configuredBase = import.meta.env.VITE_WS_URL?.trim();
-
-  if (configuredBase) {
-    const configuredUrl = new URL(configuredBase);
-    configuredUrl.searchParams.set("deviceId", deviceId);
-    return configuredUrl.toString();
-  }
-
-  if (import.meta.env.DEV) {
-    const localhostUrl = new URL("ws://localhost:4000/ws");
-    localhostUrl.searchParams.set("deviceId", deviceId);
-    return localhostUrl.toString();
-  }
-
-  if (typeof window !== "undefined") {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const runtimeUrl = new URL(`${protocol}//${window.location.host}/ws`);
-    runtimeUrl.searchParams.set("deviceId", deviceId);
-    return runtimeUrl.toString();
-  }
-
-  const fallbackUrl = new URL("ws://localhost:4000/ws");
-  fallbackUrl.searchParams.set("deviceId", deviceId);
-  return fallbackUrl.toString();
-}
 
 export function useDeviceWebSocket(deviceId: string | null) {
   const [lastMessage, setLastMessage] = useState<WsMessage | null>(null);
   const [connected, setConnected] = useState(false);
-  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectAttemptRef = useRef(0);
 
   const url = useMemo(() => {
     if (!deviceId) return null;
@@ -40,22 +14,62 @@ export function useDeviceWebSocket(deviceId: string | null) {
   }, [deviceId]);
 
   useEffect(() => {
-    if (!url) return;
-    const ws = new WebSocket(url);
-    wsRef.current = ws;
+    if (!url) {
+      setConnected(false);
+      return;
+    }
 
-    ws.onopen = () => setConnected(true);
-    ws.onclose = () => setConnected(false);
-    ws.onerror = () => setConnected(false);
-    ws.onmessage = (evt) => {
-      try {
-        setLastMessage(JSON.parse(evt.data as string));
-      } catch {
-        setLastMessage(evt.data);
-      }
+    let disposed = false;
+    let ws: WebSocket | null = null;
+    let reconnectTimer: number | null = null;
+
+    const scheduleReconnect = () => {
+      if (disposed) return;
+
+      const attempt = reconnectAttemptRef.current;
+      const delayMs = Math.min(1000 * (2 ** Math.min(attempt, 4)), 15000);
+      reconnectAttemptRef.current = attempt + 1;
+      reconnectTimer = window.setTimeout(connect, delayMs);
     };
 
-    return () => ws.close();
+    const connect = () => {
+      if (disposed) return;
+
+      ws = new WebSocket(url);
+
+      ws.onopen = () => {
+        reconnectAttemptRef.current = 0;
+        setConnected(true);
+      };
+
+      ws.onclose = () => {
+        setConnected(false);
+        scheduleReconnect();
+      };
+
+      ws.onerror = () => {
+        setConnected(false);
+      };
+
+      ws.onmessage = (evt) => {
+        try {
+          setLastMessage(JSON.parse(evt.data as string));
+        } catch {
+          setLastMessage(evt.data);
+        }
+      };
+    };
+
+    connect();
+
+    return () => {
+      disposed = true;
+      reconnectAttemptRef.current = 0;
+      if (reconnectTimer != null) window.clearTimeout(reconnectTimer);
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        ws.close();
+      }
+    };
   }, [url]);
 
   return { connected, lastMessage };

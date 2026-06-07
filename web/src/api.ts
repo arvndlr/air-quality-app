@@ -1,12 +1,4 @@
-function resolveApiBaseUrl() {
-  const configuredUrl = import.meta.env.VITE_API_URL?.trim();
-  if (configuredUrl) return configuredUrl.replace(/\/$/, "");
-
-  if (import.meta.env.DEV) return "http://localhost:4000";
-  if (typeof window !== "undefined") return window.location.origin.replace(/\/$/, "");
-
-  return "http://localhost:4000";
-}
+import { resolveApiBaseUrl } from "./runtimeUrls";
 
 export type Device = {
   externalId: string;

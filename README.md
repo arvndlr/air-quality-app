@@ -54,6 +54,12 @@ Deployment notes:
 The API listens on `http://localhost:4000`.
 Postgres is published on host port `15432` (to avoid conflicts with any local Postgres already using `5432`).
 
+For browser-based development:
+
+- On the same machine, the web app auto-connects to `http://localhost:4000` and `ws://localhost:4000/ws`.
+- From another device on your LAN, the web app now auto-connects back to the Vite host machine on port `4000`.
+- If your API or WebSocket endpoint lives elsewhere, set `VITE_API_URL` and optionally `VITE_WS_URL`.
+
 ## Create devices (for your 3 nodes)
 
 Digital ocean | npm run device:create -- --id esp32-palikpikan --name "Palikpikan"

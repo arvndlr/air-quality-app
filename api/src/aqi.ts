@@ -131,13 +131,16 @@ export function computeAqi(input: AqiInput): AqiResult | null {
   const no2Sub = no2 != null && no2 >= 0 ? calcSubIndex(no2, NO2_BP, 0) : 0;
   const so2Sub = so2 != null && so2 >= 0 ? calcSubIndex(so2, SO2_BP, 0) : 0;
 
-  const entries: Array<{ key: DominantPollutant; value: number }> = [
-    { key: "pm25", value: pm25Sub },
-    { key: "pm10", value: pm10Sub },
-    { key: "co", value: coSub },
-    { key: "no2", value: no2Sub },
-    { key: "so2", value: so2Sub },
-  ];
+  const entries: Array<{ key: DominantPollutant; value: number }> = [];
+  if (pm25 != null) entries.push({ key: "pm25", value: pm25Sub });
+  if (pm10 != null) entries.push({ key: "pm10", value: pm10Sub });
+  if (co != null && co >= 0) entries.push({ key: "co", value: coSub });
+  if (no2 != null && no2 >= 0) entries.push({ key: "no2", value: no2Sub });
+  if (so2 != null && so2 >= 0) entries.push({ key: "so2", value: so2Sub });
+
+  if (entries.length === 0) {
+    return null;
+  }
 
   const dominant = entries.reduce((a, b) => (b.value > a.value ? b : a));
   const aqi = dominant.value;

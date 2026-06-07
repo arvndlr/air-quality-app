@@ -87,6 +87,7 @@ export function AqiCard(props: {
 
       {aqi && (
         <div className="aqi-breakdown">
+          <div className="aqi-breakdown__title">AQI sub-indexes</div>
           {[
             { key: "pm25", label: "PM\u2082.\u2085", value: aqi.pm25SubIndex },
             { key: "pm10", label: "PM\u2081\u2080", value: aqi.pm10SubIndex },

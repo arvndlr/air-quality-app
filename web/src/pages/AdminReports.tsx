@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { format, formatDistanceToNowStrict, formatISO, subDays, subMonths, subWeeks } from "date-fns";
-import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { getBatteryStatus } from "../battery";
 import {
   getLatest,
@@ -76,10 +75,6 @@ export function AdminReports() {
   const [snapshots, setSnapshots] = useState<DeviceSnapshot[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [chartTypes, setChartTypes] = useState<Record<string, ChartType>>({
-    pollutants: "bar",
-    pollutantTotal: "pie"
-  });
 
   const timeWindow = useMemo(() => computeWindow(range), [range]);
   const selectedDevice = devices.find((device) => device.externalId === deviceId) ?? null;
@@ -161,159 +156,8 @@ export function AdminReports() {
   const warmingCount = snapshots.filter((snapshot) => getSo2StatusSummary(snapshot.latest).label === "Warming").length;
   const calibratingCount = snapshots.filter((snapshot) => getSo2StatusSummary(snapshot.latest).label === "Calibrating").length;
 
-  // Aggregate pollutant data by device
-  const pollutantByDevice = useMemo(() => {
-    if (!history) return [];
-
-    const deviceData: Record<string, {
-      pm25: number[];
-      pm10: number[];
-      so2: number[];
-      co: number[];
-      voc: number[];
-    }> = {};
-
-    history.rows.forEach((row) => {
-      const deviceKey = row.deviceName || row.deviceExternalId;
-      if (!deviceData[deviceKey]) {
-        deviceData[deviceKey] = { pm25: [], pm10: [], so2: [], co: [], voc: [] };
-      }
-      if (row.pm25ugm3 != null) deviceData[deviceKey].pm25.push(row.pm25ugm3);
-      if (row.pm10ugm3 != null) deviceData[deviceKey].pm10.push(row.pm10ugm3);
-      if (row.so2Ppb != null) deviceData[deviceKey].so2.push(row.so2Ppb);
-      if (row.micsCoPpm != null) deviceData[deviceKey].co.push(row.micsCoPpm);
-      if (row.vocIndex != null) deviceData[deviceKey].voc.push(row.vocIndex);
-    });
-
-    // Calculate averages per device with all pollutants
-    const result: any[] = [];
-    Object.entries(deviceData).forEach(([device, data]) => {
-      result.push({
-        device: device.substring(0, 15),
-        PM25: data.pm25.length > 0 ? Math.round((data.pm25.reduce((a, b) => a + b) / data.pm25.length) * 10) / 10 : 0,
-        PM10: data.pm10.length > 0 ? Math.round((data.pm10.reduce((a, b) => a + b) / data.pm10.length) * 10) / 10 : 0,
-        SO2: data.so2.length > 0 ? Math.round((data.so2.reduce((a, b) => a + b) / data.so2.length) * 10) / 10 : 0,
-        CO: data.co.length > 0 ? Math.round((data.co.reduce((a, b) => a + b) / data.co.length) * 10) / 10 : 0,
-        VOC: data.voc.length > 0 ? Math.round((data.voc.reduce((a, b) => a + b) / data.voc.length) * 10) / 10 : 0
-      });
-    });
-
-    return result;
-  }, [history]);
-
-  // Aggregate total pollutant distribution
-  const pollutantDistribution = useMemo(() => {
-    if (pollutantByDevice.length === 0) return [];
-
-    const totals = {
-      pm25: 0,
-      pm10: 0,
-      so2: 0,
-      co: 0,
-      voc: 0
-    };
-
-    pollutantByDevice.forEach((device) => {
-      totals.pm25 += device.PM25;
-      totals.pm10 += device.PM10;
-      totals.so2 += device.SO2;
-      totals.co += device.CO;
-      totals.voc += device.VOC;
-    });
-
-    return [
-      { name: "PM2.5", value: Math.round(totals.pm25 * 10) / 10 },
-      { name: "PM10", value: Math.round(totals.pm10 * 10) / 10 },
-      { name: "SO2", value: Math.round(totals.so2 * 10) / 10 },
-      { name: "CO", value: Math.round(totals.co * 10) / 10 },
-      { name: "VOC", value: Math.round(totals.voc * 10) / 10 }
-    ];
-  }, [pollutantByDevice]);
-
   function handlePrint() {
     window.print();
-  }
-
-  function toggleChartType(metricKey: string, nextType: ChartType) {
-    setChartTypes((prev) => ({
-      ...prev,
-      [metricKey]: nextType
-    }));
-  }
-
-  function renderChart(metricKey: string, data: any[], dataKey: string | string[], title: string, colors?: string[]) {
-    const chartType = chartTypes[metricKey] || "bar";
-    const defaultColors = colors || ["#3b82f6", "#10b981", "#f59e0b", "#ef4444"];
-    const xAxisKey = data.length > 0 && data[0].device ? "device" : "name";
-    const isMultiSeries = Array.isArray(dataKey);
-
-    return (
-      <div style={{ background: "var(--surface)", padding: "1.5rem", borderRadius: "8px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-          <h3 style={{ fontSize: "0.9rem", fontWeight: 600, textTransform: "uppercase", color: "var(--text-secondary)", margin: 0 }}>
-            {title}
-          </h3>
-          <div className="segmented" role="group" style={{ fontSize: "0.8rem" }}>
-            <button
-              type="button"
-              data-active={chartType === "bar"}
-              onClick={() => toggleChartType(metricKey, "bar")}
-              style={{ padding: "0.4rem 0.8rem" }}
-            >
-              Bar
-            </button>
-            <button
-              type="button"
-              data-active={chartType === "pie"}
-              onClick={() => toggleChartType(metricKey, "pie")}
-              style={{ padding: "0.4rem 0.8rem" }}
-            >
-              Pie
-            </button>
-          </div>
-        </div>
-
-        {chartType === "bar" && (
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey={xAxisKey} />
-              <YAxis />
-              <Tooltip />
-              {isMultiSeries ? (
-                (dataKey as string[]).map((key: string, index: number) => (
-                  <Bar key={key} dataKey={key} fill={defaultColors[index % defaultColors.length]} />
-                ))
-              ) : (
-                <Bar dataKey={dataKey as string} fill={defaultColors[0]} />
-              )}
-            </BarChart>
-          </ResponsiveContainer>
-        )}
-
-        {chartType === "pie" && (
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={data}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ [xAxisKey]: name, [isMultiSeries ? "value" : dataKey]: val }) => `${name}: ${val}`}
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey={isMultiSeries ? "value" : (dataKey as string)}
-              >
-                {data.map((_, index) => (
-                  <Cell key={`cell-${index}`} fill={defaultColors[index % defaultColors.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        )}
-      </div>
-    );
   }
 
   const sortedSnapshots = [...snapshots].sort((left, right) => {
@@ -448,39 +292,6 @@ export function AdminReports() {
                 <p>Most recent stored transmission occurred at {formatDateTime(history.summary.latestTs)}.</p>
               </div>
             </div>
-          </section>
-
-          <section className="dashboard-section report-section">
-            <div className="dashboard-section__header">
-              <div>
-                <h2 className="dashboard-section__title">Pollutant Analysis</h2>
-                <span className="dashboard-section__hint">Average pollutant concentrations across all devices in the reporting window.</span>
-              </div>
-            </div>
-
-            {pollutantByDevice.length === 0 ? (
-              <div className="chart__empty" style={{ height: 220 }}>
-                No pollutant data available for this report window.
-              </div>
-            ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(600px, 1fr))", gap: "2rem", marginTop: "2rem" }}>
-                {renderChart(
-                  "pollutants",
-                  pollutantByDevice,
-                  ["PM25", "PM10", "SO2", "CO", "VOC"],
-                  "Pollutant Distribution by Device",
-                  ["#ef4444", "#f97316", "#f59e0b", "#8b5cf6", "#06b6d4"]
-                )}
-
-                {renderChart(
-                  "pollutantTotal",
-                  pollutantDistribution,
-                  "value",
-                  "Overall Pollutant Distribution",
-                  ["#ef4444", "#f97316", "#f59e0b", "#8b5cf6", "#06b6d4"]
-                )}
-              </div>
-            )}
           </section>
 
           <section className="dashboard-section report-section">

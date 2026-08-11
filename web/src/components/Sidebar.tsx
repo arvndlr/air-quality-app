@@ -6,11 +6,7 @@ const navItems = [
   { to: "/admin/sensor-nodes", label: "Sensor Nodes", icon: "SNS" },
   { to: "/admin/aqi-guide", label: "Pollutant Info", icon: "INF" },
   { to: "/admin/transmission-history", label: "Transmission History", icon: "LOG" },
-  { to: "/admin/admin-reports", label: "Admin Reports", icon: "RPT" },
-  { to: "/admin/faqs", label: "FAQs", icon: "FAQ" },
-  { to: "/admin/about-us", label: "About Us", icon: "BIO" },
-  { to: "/admin/terms", label: "Terms", icon: "TOS" },
-  { to: "/admin/settings", label: "Settings", icon: "CFG" }
+  { to: "/admin/admin-reports", label: "Admin Reports", icon: "RPT" }
 ];
 
 export function Sidebar() {

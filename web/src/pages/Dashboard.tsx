@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatDistanceToNowStrict, formatISO, subDays, subMonths, subWeeks, subYears } from "date-fns";
+import { useSearchParams } from "react-router-dom";
 import { getLatest, getSeries, listDevices, type AqiResult, type Device, type Measurement, type SeriesPoint } from "../api";
 import { getBatteryStatus } from "../battery";
 import { ChartCard } from "../components/ChartCard";
@@ -53,6 +54,8 @@ function computeWindow(range: RangeKey) {
 }
 
 export function Dashboard() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedDeviceId = searchParams.get("deviceId");
   const [devices, setDevices] = useState<Device[]>([]);
   const [deviceId, setDeviceId] = useState<string | null>(() => loadSavedDeviceId());
   const [range, setRange] = useState<RangeKey>("day");
@@ -73,6 +76,7 @@ export function Dashboard() {
         if (!active) return;
         setDevices(d);
         setDeviceId((current) => {
+          if (requestedDeviceId && d.some((device) => device.externalId === requestedDeviceId)) return requestedDeviceId;
           if (current && d.some((device) => device.externalId === current)) return current;
           return d[0]?.externalId ?? null;
         });
@@ -85,7 +89,7 @@ export function Dashboard() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [requestedDeviceId]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -100,6 +104,20 @@ export function Dashboard() {
       // Ignore storage failures and keep the dashboard usable.
     }
   }, [deviceId]);
+
+  useEffect(() => {
+    const currentParam = searchParams.get("deviceId");
+
+    if (deviceId === currentParam) return;
+
+    const nextParams = new URLSearchParams(searchParams);
+    if (deviceId) {
+      nextParams.set("deviceId", deviceId);
+    } else {
+      nextParams.delete("deviceId");
+    }
+    setSearchParams(nextParams, { replace: true });
+  }, [deviceId, searchParams, setSearchParams]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setStatusNow(Date.now()), 30000);

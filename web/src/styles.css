@@ -2067,6 +2067,20 @@ select option {
   gap: 12px;
 }
 
+.sensor-node-card--interactive {
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sensor-node-card--interactive:hover,
+.sensor-node-card--interactive:focus-visible {
+  transform: translateY(-2px);
+  border-color: rgba(20, 150, 106, 0.28);
+  box-shadow: var(--shadow-card);
+  outline: none;
+}
+
 .sensor-node-card__header {
   display: flex;
   align-items: center;

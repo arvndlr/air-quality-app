@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { formatDistanceToNowStrict } from "date-fns";
+import { Link } from "react-router-dom";
 import { getLatest, listDevices, type AqiResult, type Device, type Measurement } from "../api";
 import { getBatteryStatus } from "../battery";
 import { formatDurationCompact, formatResetReason, getSo2StatusSummary, isMeasurementOnline } from "../deviceStatus";
@@ -93,7 +94,11 @@ export function SensorNodes() {
           const uptimeText = formatDurationCompact(n.latest?.uptimeSec);
           const resetReasonText = formatResetReason(n.latest?.resetReason);
           return (
-            <div key={n.device.externalId} className="sensor-node-card">
+            <Link
+              key={n.device.externalId}
+              className="sensor-node-card sensor-node-card--interactive"
+              to={`/admin?deviceId=${encodeURIComponent(n.device.externalId)}`}
+            >
               <div className="sensor-node-card__header">
                 <div className="sensor-node-card__name">
                   <StatusDot online={online} />
@@ -210,7 +215,7 @@ export function SensorNodes() {
                   </div>
                 </>
               )}
-            </div>
+            </Link>
           );
         })}
       </div>

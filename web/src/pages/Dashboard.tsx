@@ -221,7 +221,9 @@ export function Dashboard() {
       <div className="dashboard-section">
         <div className="dashboard-section__header">
           <h2 className="dashboard-section__title">Monitored Pollutants</h2>
-          <span className="dashboard-section__hint">Click any pollutant card to view thresholds, health notes, and specific recommendations.</span>
+          <span className="dashboard-section__hint">
+            Hover a pollutant card to see the illnesses it can cause; click it for thresholds, health notes, and recommendations.
+          </span>
         </div>
         <div className="pollutant-grid-row">
           <PollutantCard

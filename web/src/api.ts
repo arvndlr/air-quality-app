@@ -80,14 +80,38 @@ export type TransmissionHistorySummary = {
   statusCounts: Record<TransmissionStatus, number>;
 };
 
+export type TransmissionPollutantRollup = {
+  pm25: number | null;
+  pm10: number | null;
+  so2: number | null;
+  co: number | null;
+  no2: number | null;
+  co2: number | null;
+  voc: number | null;
+};
+
+export type TransmissionDailySummary = {
+  day: string;
+  totalRows: number;
+  deviceCount: number;
+  firstTs: string | null;
+  lastTs: string | null;
+  averageGapSec: number | null;
+  statusCounts: Record<TransmissionStatus, number>;
+  averages: TransmissionPollutantRollup;
+  peaks: TransmissionPollutantRollup;
+};
+
 export type TransmissionHistoryResponse = {
   filters: {
     deviceId: string | null;
     from: string;
     to: string;
     status: TransmissionStatus | "all";
+    timeZone: string;
   };
   summary: TransmissionHistorySummary;
+  daily: TransmissionDailySummary[];
   pagination: {
     page: number;
     pageSize: number;
@@ -148,17 +172,26 @@ export async function getSeries(params: {
   return json.points;
 }
 
-export async function getTransmissionHistory(params: {
+export type TransmissionQuery = {
   deviceId?: string | null;
   from: string;
   to: string;
   status?: TransmissionStatus | "all";
-  page?: number;
-  pageSize?: number;
-}): Promise<TransmissionHistoryResponse> {
-  const url = new URL(`${API_URL}/api/v1/transmissions`);
+};
+
+/** Day buckets and export filenames follow the browser's zone so saved logs match what admins see. */
+export function getBrowserTimeZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
+
+function applyTransmissionQuery(url: URL, params: TransmissionQuery) {
   url.searchParams.set("from", params.from);
   url.searchParams.set("to", params.to);
+  url.searchParams.set("timeZone", getBrowserTimeZone());
 
   if (params.deviceId) {
     url.searchParams.set("deviceId", params.deviceId);
@@ -167,6 +200,13 @@ export async function getTransmissionHistory(params: {
   if (params.status) {
     url.searchParams.set("status", params.status);
   }
+}
+
+export async function getTransmissionHistory(
+  params: TransmissionQuery & { page?: number; pageSize?: number }
+): Promise<TransmissionHistoryResponse> {
+  const url = new URL(`${API_URL}/api/v1/transmissions`);
+  applyTransmissionQuery(url, params);
 
   if (params.page != null) {
     url.searchParams.set("page", String(params.page));
@@ -179,4 +219,32 @@ export async function getTransmissionHistory(params: {
   const res = await fetch(url);
   if (!res.ok) throw new Error("Failed to load transmission history");
   return (await res.json()) as TransmissionHistoryResponse;
+}
+
+export type TransmissionExportMode = "detail" | "daily";
+
+/** Fetches the CSV export and hands it to the browser as a download. */
+export async function downloadTransmissionCsv(
+  params: TransmissionQuery & { mode?: TransmissionExportMode }
+): Promise<void> {
+  const mode = params.mode ?? "detail";
+  const url = new URL(`${API_URL}/api/v1/transmissions/export`);
+  applyTransmissionQuery(url, params);
+  url.searchParams.set("mode", mode);
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Failed to export the transmission log");
+
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const scope = params.deviceId ? params.deviceId.replace(/[^a-zA-Z0-9_-]/g, "-") : "all-devices";
+  const stamp = (value: string) => value.slice(0, 19).replace(/[:T]/g, "-");
+
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = `transmissions-${mode}-${scope}-${stamp(params.from)}_to_${stamp(params.to)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(objectUrl);
 }

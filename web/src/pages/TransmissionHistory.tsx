@@ -1,25 +1,29 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { format, formatDistanceToNowStrict, formatISO, subDays, subMonths, subWeeks } from "date-fns";
+import { format, formatDistanceToNowStrict, formatISO, parseISO } from "date-fns";
 import {
+  downloadTransmissionCsv,
   getTransmissionHistory,
   listDevices,
   type Device,
+  type TransmissionExportMode,
   type TransmissionHistoryResponse,
   type TransmissionRow,
   type TransmissionStatus
 } from "../api";
 import { formatDurationCompact, formatResetReason } from "../deviceStatus";
+import {
+  defaultCustomEnd,
+  defaultCustomStart,
+  describeRange,
+  rangeOptions,
+  resolveRange,
+  toDateInputValue,
+  type RangeKey
+} from "../reportRange";
 
-type RangeKey = "day" | "week" | "month";
 type StatusFilter = TransmissionStatus | "all";
 
 const PAGE_SIZE = 20;
-
-const ranges: Array<{ key: RangeKey; label: string }> = [
-  { key: "day", label: "24 Hours" },
-  { key: "week", label: "7 Days" },
-  { key: "month", label: "30 Days" }
-];
 
 const statusOptions: Array<{ value: StatusFilter; label: string }> = [
   { value: "all", label: "All states" },
@@ -37,20 +41,6 @@ const statusLabels: Record<TransmissionStatus, string> = {
 };
 
 const numberFormatter = new Intl.NumberFormat("en-US");
-
-function computeWindow(range: RangeKey) {
-  const now = new Date();
-
-  if (range === "day") {
-    return { from: subDays(now, 1), to: now };
-  }
-
-  if (range === "week") {
-    return { from: subWeeks(now, 1), to: now };
-  }
-
-  return { from: subMonths(now, 1), to: now };
-}
 
 function formatDateTime(value: string | null) {
   if (!value) return "—";
@@ -98,6 +88,15 @@ function formatSo2Detail(row: TransmissionRow) {
   return "SO2 state unavailable";
 }
 
+function formatDayLabel(day: string) {
+  return format(parseISO(day), "EEE, MMM d, yyyy");
+}
+
+function formatRollup(value: number | null, digits: number) {
+  if (value == null) return "—";
+  return value.toFixed(digits);
+}
+
 function formatPageRange(history: TransmissionHistoryResponse) {
   if (history.pagination.totalRows === 0) return "No transmissions in the selected window.";
 
@@ -110,15 +109,38 @@ export function TransmissionHistory() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [deviceId, setDeviceId] = useState<string>("");
   const [range, setRange] = useState<RangeKey>("week");
+  const [customFrom, setCustomFrom] = useState<string>(defaultCustomStart);
+  const [customTo, setCustomTo] = useState<string>(defaultCustomEnd);
   const [status, setStatus] = useState<StatusFilter>("all");
   const [page, setPage] = useState(1);
   const [history, setHistory] = useState<TransmissionHistoryResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState<TransmissionExportMode | null>(null);
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
 
-  const timeWindow = useMemo(() => computeWindow(range), [range]);
+  const resolved = useMemo(() => resolveRange(range, customFrom, customTo), [range, customFrom, customTo]);
+  const rangeError = resolved.error;
+  const fromIso = rangeError ? null : formatISO(resolved.from);
+  const toIso = rangeError ? null : formatISO(resolved.to);
+  const windowLabel = describeRange(range, resolved.from, resolved.to);
+  const todayValue = toDateInputValue(new Date());
   const selectedDevice = devices.find((device) => device.externalId === deviceId) ?? null;
+
+  async function handleExport(mode: TransmissionExportMode) {
+    if (!fromIso || !toIso) return;
+
+    setExporting(mode);
+    setError(null);
+
+    try {
+      await downloadTransmissionCsv({ deviceId: deviceId || null, from: fromIso, to: toIso, status, mode });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Failed to export the transmission log");
+    } finally {
+      setExporting(null);
+    }
+  }
 
   useEffect(() => {
     let active = true;
@@ -140,17 +162,19 @@ export function TransmissionHistory() {
 
   useEffect(() => {
     setPage(1);
-  }, [deviceId, range, status]);
+  }, [deviceId, range, customFrom, customTo, status]);
 
   useEffect(() => {
+    if (!fromIso || !toIso) return;
+
     let active = true;
     setLoading(true);
     setError(null);
 
     getTransmissionHistory({
       deviceId: deviceId || null,
-      from: formatISO(timeWindow.from),
-      to: formatISO(timeWindow.to),
+      from: fromIso,
+      to: toIso,
       status,
       page,
       pageSize: PAGE_SIZE
@@ -171,12 +195,12 @@ export function TransmissionHistory() {
     return () => {
       active = false;
     };
-  }, [deviceId, page, status, timeWindow.from, timeWindow.to]);
+  }, [deviceId, page, status, fromIso, toIso]);
 
   useEffect(() => {
     if (!tableScrollRef.current) return;
     tableScrollRef.current.scrollTop = 0;
-  }, [deviceId, page, range, status]);
+  }, [deviceId, page, range, customFrom, customTo, status]);
 
   return (
     <div className="page page--history">
@@ -186,7 +210,7 @@ export function TransmissionHistory() {
             <div className="topbar__title">Transmission History</div>
             <div className="topbar__status">
               {selectedDevice ? `Device: ${selectedDevice.name ?? selectedDevice.externalId}` : "Device: all registered nodes"}
-              {" | "}Window: {ranges.find((item) => item.key === range)?.label ?? "Custom"}
+              {" | "}Window: {windowLabel}
               {history?.summary.latestTs ? ` | Latest ${formatRelativeTime(history.summary.latestTs)}` : ""}
               {loading ? " | Refreshing" : ""}
             </div>
@@ -202,7 +226,7 @@ export function TransmissionHistory() {
             </select>
 
             <div className="segmented" role="group" aria-label="History range">
-              {ranges.map((item) => (
+              {rangeOptions.map((item) => (
                 <button key={item.key} type="button" data-active={range === item.key} onClick={() => setRange(item.key)}>
                   {item.label}
                 </button>
@@ -219,6 +243,66 @@ export function TransmissionHistory() {
           </div>
         </header>
 
+        <div className="date-search-bar">
+          {range === "custom" ? (
+            <div className="date-search-bar__fields">
+              <label className="date-search-field">
+                <span>From date</span>
+                <input
+                  type="date"
+                  max={customTo || todayValue}
+                  value={customFrom}
+                  onChange={(event) => setCustomFrom(event.target.value)}
+                />
+              </label>
+              <label className="date-search-field">
+                <span>To date</span>
+                <input
+                  type="date"
+                  min={customFrom || undefined}
+                  value={customTo}
+                  onChange={(event) => setCustomTo(event.target.value)}
+                />
+              </label>
+              <button
+                className="date-search-bar__reset"
+                type="button"
+                onClick={() => {
+                  const today = toDateInputValue(new Date());
+                  setCustomFrom(today);
+                  setCustomTo(today);
+                }}
+              >
+                Today only
+              </button>
+            </div>
+          ) : (
+            <div className="date-search-bar__hint">
+              Choose <strong>Custom dates</strong> to search a specific day or date range.
+            </div>
+          )}
+
+          <div className="date-search-bar__actions">
+            <button
+              className="report-print-button"
+              type="button"
+              disabled={!fromIso || exporting != null}
+              onClick={() => handleExport("detail")}
+            >
+              {exporting === "detail" ? "Saving..." : "Save log (CSV)"}
+            </button>
+            <button
+              className="report-print-button report-print-button--ghost"
+              type="button"
+              disabled={!fromIso || exporting != null}
+              onClick={() => handleExport("daily")}
+            >
+              {exporting === "daily" ? "Saving..." : "Save daily summary (CSV)"}
+            </button>
+          </div>
+        </div>
+
+        {rangeError && <div className="error history-error">{rangeError}</div>}
         {error && <div className="error history-error">{error}</div>}
 
         {history && (
@@ -268,6 +352,99 @@ export function TransmissionHistory() {
           </>
         )}
       </div>
+
+      {history && (
+        <section className="history-table-panel daily-summary-panel">
+          <div className="dashboard-section__header">
+            <div>
+              <h2 className="dashboard-section__title">Daily summary</h2>
+              <span className="dashboard-section__hint">
+                One row per calendar day in the searched window, with transmission counts and the average and peak reading of
+                each pollutant.
+              </span>
+            </div>
+          </div>
+
+          {history.daily.length === 0 ? (
+            <div className="chart__empty" style={{ height: 180 }}>
+              No days to summarise for the current search.
+            </div>
+          ) : (
+            <div className="aqi-table-wrapper history-table-wrapper">
+              <table className="aqi-table history-table daily-summary-table">
+                <thead>
+                  <tr>
+                    <th>Day</th>
+                    <th>Transmissions</th>
+                    <th>Telemetry states</th>
+                    <th>Cadence</th>
+                    <th>Average readings</th>
+                    <th>Peak readings</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.daily.map((day) => (
+                    <tr key={day.day}>
+                      <td>
+                        <div className="history-cell-stack">
+                          <strong>{formatDayLabel(day.day)}</strong>
+                          <span>
+                            {formatDateTime(day.firstTs)} to {formatDateTime(day.lastTs)}
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="history-cell-stack">
+                          <strong>{formatCount(day.totalRows)}</strong>
+                          <span>
+                            {formatCount(day.deviceCount)} {day.deviceCount === 1 ? "device" : "devices"}
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="history-metric-list">
+                          <span>Ready: {formatCount(day.statusCounts.ready)}</span>
+                          <span>Warming: {formatCount(day.statusCounts.warming)}</span>
+                          <span>Calibrating: {formatCount(day.statusCounts.calibrating)}</span>
+                          <span>Unknown: {formatCount(day.statusCounts.unknown)}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="history-cell-stack">
+                          <strong>{day.averageGapSec == null ? "Single sample" : formatDurationValue(day.averageGapSec)}</strong>
+                          <span>Average interval</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="history-metric-list">
+                          <span>PM2.5: {formatRollup(day.averages.pm25, 1)} ug/m3</span>
+                          <span>PM10: {formatRollup(day.averages.pm10, 1)} ug/m3</span>
+                          <span>SO2: {formatRollup(day.averages.so2, 1)} ppb</span>
+                          <span>CO: {formatRollup(day.averages.co, 1)} ppm</span>
+                          <span>NO2: {formatRollup(day.averages.no2, 1)} ppb</span>
+                          <span>CO2: {formatRollup(day.averages.co2, 0)} ppm</span>
+                          <span>VOC: {formatRollup(day.averages.voc, 0)} index</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="history-metric-list">
+                          <span>PM2.5: {formatRollup(day.peaks.pm25, 1)} ug/m3</span>
+                          <span>PM10: {formatRollup(day.peaks.pm10, 1)} ug/m3</span>
+                          <span>SO2: {formatRollup(day.peaks.so2, 1)} ppb</span>
+                          <span>CO: {formatRollup(day.peaks.co, 1)} ppm</span>
+                          <span>NO2: {formatRollup(day.peaks.no2, 1)} ppb</span>
+                          <span>CO2: {formatRollup(day.peaks.co2, 0)} ppm</span>
+                          <span>VOC: {formatRollup(day.peaks.voc, 0)} index</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
 
       {history && (
         <section className="history-table-panel">

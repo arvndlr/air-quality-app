@@ -3468,3 +3468,240 @@ select option {
     color: #111827 !important;
   }
 }
+
+/* ═══════════════════ DATE SEARCH BAR ═══════════════════ */
+.date-search-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.date-search-bar__fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.date-search-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.date-search-field span {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.date-search-field input {
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel2);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.date-search-field input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-dim);
+}
+
+.date-search-bar__reset {
+  border: 1px solid var(--border);
+  background: var(--panel2);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.date-search-bar__reset:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.date-search-bar__hint {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.date-search-bar__hint strong {
+  color: var(--text);
+}
+
+.date-search-bar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.report-print-button--ghost {
+  border-color: var(--border);
+  background: var(--panel2);
+}
+
+.report-print-button--ghost:hover {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.report-print-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.daily-summary-panel {
+  margin-bottom: 18px;
+}
+
+.daily-summary-table td,
+.daily-summary-table th {
+  vertical-align: top;
+}
+
+/* ═══════════════════ POLLUTANT HEALTH HOVER ═══════════════════ */
+.pollutant-stat-card {
+  position: relative;
+}
+
+.pollutant-stat-card__risk {
+  margin-top: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.pollutant-stat-card__risk--alert {
+  color: #b45309;
+}
+
+.pollutant-stat-card--alert {
+  border-color: rgba(220, 38, 38, 0.45);
+}
+
+.pollutant-stat-card--alert:hover {
+  border-color: rgba(220, 38, 38, 0.7);
+}
+
+.health-tooltip {
+  max-height: calc(100vh - 24px);
+  overflow: hidden;
+  position: fixed;
+  z-index: 60;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--shadow-strong);
+  pointer-events: none;
+  text-align: left;
+}
+
+.health-tooltip--alert {
+  border-color: rgba(220, 38, 38, 0.5);
+}
+
+.health-tooltip__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.health-tooltip__title {
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.health-tooltip__badge {
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.health-tooltip__lead {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.health-tooltip__section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.health-tooltip__list {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.health-tooltip__list li {
+  margin-bottom: 2px;
+}
+
+.health-tooltip__text {
+  font-size: 12px;
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+
+.health-tooltip__footer {
+  font-size: 11px;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+.modal__section-list {
+  margin: 0 0 8px;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+@media (max-width: 900px) {
+  .date-search-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .date-search-bar__actions .report-print-button {
+    flex: 1 1 auto;
+  }
+}
+
+@media print {
+  .health-tooltip,
+  .pollutant-stat-card__risk {
+    display: none !important;
+  }
+}

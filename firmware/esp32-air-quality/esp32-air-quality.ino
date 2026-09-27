@@ -20,23 +20,22 @@
 // Wiring:
 // - I2C: SDA=21, SCL=22 (shared BME680 + SCD40)
 // - Plantower UART: sensor TX -> GPIO16 (ESP32 RX2), sensor RX -> GPIO17 (ESP32 TX2)
-// - ULPSM-SO2:
-//     Pin 7/8 V+ -> 3.3V
-//     Pin 6 GND -> GND
-//     Pin 1 Vgas -> GPIO34 (ADC1)
-//     Pin 2 Vref -> GPIO35 (ADC1)
-//     Pin 3 Vtemp -> GPIO39 (ADC1, optional, disabled below because GPIO39 is reused for battery sensing)
-// - MiCS-6814: CO -> GPIO32, NO2 -> GPIO33, NH3 -> GPIO36
+// - ULPSM-SO2: NOT wired to this board. The sensor lives on a second ESP32
+//   running firmware/esp32-so2-only, which streams readings in over UART:
+//     SO2 node GPIO17 (TX) -> this board GPIO25 (Serial1 RX)
+//     SO2 node GND         -> this board GND    (REQUIRED common ground)
+//   GPIO34/35 are now free on this board — the ULPSM analog lines belong to
+//   the SO2 node only.
+// - MiCS-6814: CO -> GPIO32, NO2 -> GPIO33, NH3 -> GPIO36 
 // - Battery voltage sensor OUT -> GPIO39 (ADC1, input only)
 // - Charger relay IN -> GPIO26
 //
 // IMPORTANT:
 // - Copy secrets.h.example to secrets.h and fill in your credentials.
 // - API_URL must be your PC's LAN IP (NOT localhost).
-// - ULPSM-SO2 needs about 60 minutes of warm-up before baseline capture in production.
-//   Set SO2_TEST_MODE=1 below for a short bench-test warm-up.
-// - Vref and Vtemp are high-impedance outputs; buffer them if the ESP32 ADC
-//   readings are unstable or if you need better accuracy.
+// - SO2 warm-up (about 60 minutes) and clean-air baseline capture happen on the
+//   SO2 node, not here. This board only parses, forwards and reports whatever
+//   status that node sends.
 // - Do not connect a raw 12V battery directly to GPIO39. Use a voltage divider
 //   or voltage-sensor module that keeps the ESP32 ADC input at or below 3.3V.
 //
@@ -55,9 +54,19 @@
 #include <SparkFun_SCD4x_Arduino_Library.h>
 #include <esp_system.h>
 #include <time.h>
+#include <string.h>
+#include <ctype.h>
+#include <stdlib.h>
 
 // Credentials & endpoint — keep out of version control
 #include "secrets.h"
+
+// ================= BENCH TEST SWITCHES =================
+// Set WIFI_ENABLED to 0 to run completely offline: no WiFi, no NTP, no HTTP
+// POST, no offline buffering. Every reading is printed to the serial monitor
+// instead, including the JSON that would have been sent. Set it back to 1 for
+// normal operation.
+#define WIFI_ENABLED 0
 
 // ================= PIN CONFIG =================
 #define SDA_PIN 21
@@ -74,21 +83,44 @@
 #define BME680_ADDR_LOW 0x76
 #define BME680_ADDR_HIGH 0x77
 
-// ULPSM-SO2 analog pins (ADC1 only — ADC2 unusable with WiFi)
-#define SO2_VGAS_PIN 34
-#define SO2_VREF_PIN 35
-#define SO2_VTEMP_PIN 39
-#define SO2_HAS_VTEMP 0
+// ---------- ULPSM-SO2 link (Serial1, receive-only) ----------
+// The SO2 sensor is not attached to this board. firmware/esp32-so2-only runs on
+// a separate ESP32, does its own ADC sampling, warm-up and clean-air baseline,
+// and pushes ASCII frames here every 10 s. See so2LinkHandleLine() for the format.
+//
+// The link is deliberately one-way. The SO2 node's wiring notes suggest GPIO26
+// for the optional reverse (command) direction, but GPIO26 is the charger relay
+// on this board, so nothing is transmitted back and the collision disappears.
+// If a command channel is ever needed, set SO2_LINK_TX_PIN to a free pin such
+// as GPIO27 and wire it to the SO2 node's GPIO16 — never GPIO26.
+#define SO2_LINK_UART Serial1
+#define SO2_LINK_RX_PIN 25 // <- SO2 node GPIO17 (TX)
+#define SO2_LINK_TX_PIN -1 // unused; GPIO26 is taken by CHARGER_RELAY_PIN
+static const uint32_t SO2_LINK_BAUD = 9600;
+
+// The node sends one frame per 10 s. Treat the link as down after 6 misses so a
+// yanked cable shows up as missing data instead of a frozen last-known reading.
+static const uint32_t SO2_LINK_STALE_MS = 60000;
+
+// Set to 1 to log every accepted SO2 frame as it arrives.
+#define SO2_LINK_DEBUG 0
+
+// Set to 1 to echo every raw byte arriving on SO2_LINK_RX_PIN. Use this to tell
+// "nothing is arriving" (wiring/power/ground) apart from "bytes arrive but are
+// corrupt" (baud mismatch, bad ground, noisy run). Printable characters show
+// as-is, everything else as <HH>. Turn it back off once the link is healthy.
+#define SO2_LINK_RAW_DEBUG 1
+
+// Serial1 RX buffer. The default 256 bytes overflows during long blocking
+// sections in setup() (MiCS warm-up, WiFi retry, NTP), which corrupts the
+// frames that were mid-flight. Frames are ~70 bytes each.
+static const size_t SO2_LINK_RX_BUFFER = 1024;
 
 // Battery / charger control
 #define BATTERY_MONITOR_ENABLED 1
 #define BATTERY_VOLTAGE_PIN 39
 #define CHARGER_RELAY_PIN 26
 #define CHARGER_RELAY_ACTIVE_LOW 1
-
-#if BATTERY_MONITOR_ENABLED && SO2_HAS_VTEMP
-#error "GPIO39 cannot be used for both SO2_VTEMP_PIN and BATTERY_VOLTAGE_PIN."
-#endif
 
 // CJMCU-6814 (MiCS-6814) analog pins (ADC1 only — ADC2 unusable with WiFi)
 #define MICS_CO_PIN  32
@@ -188,37 +220,31 @@ static float micsNH3_ppm(float vOut) {
   return fminf(ppm, 500.0f);
 }
 
-// ================= ULPSM-SO2 via ESP32 ADC =================
-// ~30 nA/ppm sensitivity at 100k TIA gain => 3 mV/ppm => 1 mV ≈ 333 ppb.
-// Vref is still useful for diagnostics, but this firmware captures a clean-air
-// differential baseline after warm-up and estimates concentration from delta signal.
-// Set to 1 for a shorter 30-minute bench-test warm-up. Use 0 for a 60-minute production baseline.
-#define SO2_TEST_MODE 0
+// ================= ULPSM-SO2 state (mirrored from the SO2 node) =================
+// Everything below is a cache of the last frame received over SO2_LINK_UART.
+// No SO2 sampling, warm-up timing or baseline maths happens on this board.
+static const size_t SO2_LINK_LINE_MAX = 192;
+static char   so2LinkLine[SO2_LINK_LINE_MAX];
+static size_t so2LinkLineLen = 0;
+static bool   so2LinkLineTooLong = false;
 
-static const uint32_t SO2_WARMUP_MS = (SO2_TEST_MODE ? 30UL : 60UL) * 60UL * 1000UL;
-static const uint8_t  SO2_BASELINE_POINTS = 12;   // 12 x 10 s = 2 minutes after warm-up
-static const float    SO2_MV_PER_PPM = 3.0f;
-static const float    SO2_BASELINE_SPAN_LIMIT_MV = 10.0f; // Temporary relaxation for field debugging
-static const float    SO2_ADC_CALIBRATION = 1.00f;
-static const float    SO2_EMA_ALPHA = 0.05f;
-static const int      SO2_FILTER_SAMPLES = 9;
-static const int      SO2_FILTER_DROP = 2;
-static const int      SO2_ADC_DISCARD_SAMPLES = 3;
-static const int      SO2_ADC_SETTLE_US = 300;
+static bool     so2LinkSeen = false;        // at least one valid frame since boot
+static uint32_t so2LinkLastFrameMs = 0;
+static char     so2LinkStatus[16] = "";     // ok | warming | calibrating
+static float    so2Vgas = NAN;
+static float    so2Vref = NAN;
+static float    so2DeltaMv = NAN;
+static float    so2Ppb = NAN;
+static uint32_t so2WarmupLeftSec = 0;
+static uint16_t so2CalDone = 0;
+static uint16_t so2CalTotal = 0;
+static uint32_t so2NodeUptimeSec = 0;
+static uint32_t so2LinkBadFrames = 0;
+static uint32_t so2LinkBytesRx = 0;   // raw bytes seen on the link since boot
 
 RTC_DATA_ATTR static uint32_t rtcBootCount = 0;
-static uint32_t so2BootMs = 0;
 static uint32_t bootCount = 0;
 static esp_reset_reason_t bootResetReason = ESP_RST_UNKNOWN;
-static float so2BaselineVgas = 0.0f;
-static float so2BaselineVref = 0.0f;
-static float so2BaselineSignalMv = 0.0f;
-static float so2SmoothedMv = 0.0f;
-static float so2CalVgas[SO2_BASELINE_POINTS];
-static float so2CalVref[SO2_BASELINE_POINTS];
-static uint8_t so2CalCount = 0;
-static bool  so2EmaInit = false;
-static bool  so2Healthy = false;      // true only after warm-up + stable clean-air baseline
 static float vocBaselineKohm = 0.0f;
 static bool  vocBaselineReady = false;
 static int   lastBatteryRaw = 0;
@@ -234,7 +260,6 @@ static uint32_t batteryHighSinceMs = 0;
 
 static int analogReadAvgWithSamples(int pin, int sampleCount);
 static int analogReadMilliVoltsAvgWithSamples(int pin, int sampleCount);
-static int analogReadMilliVoltsSettledWithSamples(int pin, int sampleCount, int discardCount, int settleUs);
 
 static const char *resetReasonLabel(esp_reset_reason_t reason) {
   switch (reason) {
@@ -252,156 +277,180 @@ static const char *resetReasonLabel(esp_reset_reason_t reason) {
   }
 }
 
-static bool so2WarmupComplete() {
-  return millis() - so2BootMs >= SO2_WARMUP_MS;
+static bool so2LinkOnline() {
+  return so2LinkSeen && (millis() - so2LinkLastFrameMs) < SO2_LINK_STALE_MS;
 }
 
-static uint32_t so2WarmupRemainingSec() {
-  if (so2WarmupComplete()) return 0;
-  const uint32_t elapsedMs = millis() - so2BootMs;
-  const uint32_t remainingMs = SO2_WARMUP_MS > elapsedMs ? (SO2_WARMUP_MS - elapsedMs) : 0;
-  return (remainingMs + 999UL) / 1000UL;
+// True only while the node is reachable AND reporting a calibrated measurement.
+static bool so2Ready() {
+  return so2LinkOnline() && strcmp(so2LinkStatus, "ok") == 0;
 }
 
+// "offline" is for local logging only — the API's so2Status enum does not
+// accept it, so the payload builder omits the field instead of sending it.
 static const char *so2StatusLabel() {
-  if (so2Healthy) return "ok";
-  if (!so2WarmupComplete()) return "warming";
-  return "calibrating";
+  if (!so2LinkOnline()) return "offline";
+  return so2LinkStatus;
 }
 
-static float so2_signal_mv(float vgas, float vref) {
-  return (vgas - vref) * 1000.0f;
-}
+// ================= SO2 UART LINK =================
+// Frames from firmware/esp32-so2-only, one per 10 s:
+//
+//   $SO2,<status>,<vgas>,<vref>,<delta_mv>,<ppb>,<warmup_left_s>,<cal_done>,<cal_total>,<uptime_s>*<CS>
+//   $SO2BASE,<vgas0>,<vref0>,<signal0_mv>*<CS>        (one-shot, on calibration)
+//
+// <CS> is the XOR of every character between '$' and '*', two hex digits.
 
-static float so2_delta_mv(float vgas, float vref) {
-  return so2_signal_mv(vgas, vref) - so2BaselineSignalMv;
-}
-
-static float so2_ppb_from_delta(float deltaMv) {
-  if (!so2Healthy) return -1.0f;
-
-  if (!so2EmaInit) {
-    so2SmoothedMv = deltaMv;
-    so2EmaInit = true;
-  } else {
-    so2SmoothedMv = SO2_EMA_ALPHA * deltaMv + (1.0f - SO2_EMA_ALPHA) * so2SmoothedMv;
-  }
-
-  float ppb = so2SmoothedMv / SO2_MV_PER_PPM * 1000.0f;
-  if (ppb < 0.0f) return 0.0f;
-  if (ppb > 1000.0f) return 1000.0f;
-  return ppb;
-}
-
-static void sortFloatArray(float *values, int count) {
-  for (int i = 1; i < count; i++) {
-    float key = values[i];
-    int j = i - 1;
-    while (j >= 0 && values[j] > key) {
-      values[j + 1] = values[j];
-      j--;
-    }
-    values[j + 1] = key;
-  }
-}
-
-static float trimmedMean(float *samples, int count, int drop) {
-  sortFloatArray(samples, count);
-
-  float sum = 0.0f;
-  int used = 0;
-  for (int i = drop; i < count - drop; i++) {
-    sum += samples[i];
-    used++;
-  }
-
-  return used > 0 ? (sum / used) : samples[count / 2];
-}
-
-// Use a trimmed mean so occasional ADC spikes do not dominate the reading.
-static void readSo2Filtered(float &vgasVolts, float &vrefVolts, float &signalMv) {
-  float vgasSamples[SO2_FILTER_SAMPLES];
-  float vrefSamples[SO2_FILTER_SAMPLES];
-  float signalSamples[SO2_FILTER_SAMPLES];
-
-  for (int i = 0; i < SO2_FILTER_SAMPLES; i++) {
-    const float vgasMv =
-      (float)analogReadMilliVoltsSettledWithSamples(
-        SO2_VGAS_PIN,
-        ADC_SAMPLES,
-        SO2_ADC_DISCARD_SAMPLES,
-        SO2_ADC_SETTLE_US
-      ) * SO2_ADC_CALIBRATION;
-    const float vrefMv =
-      (float)analogReadMilliVoltsSettledWithSamples(
-        SO2_VREF_PIN,
-        ADC_SAMPLES,
-        SO2_ADC_DISCARD_SAMPLES,
-        SO2_ADC_SETTLE_US
-      ) * SO2_ADC_CALIBRATION;
-
-    vgasSamples[i] = vgasMv / 1000.0f;
-    vrefSamples[i] = vrefMv / 1000.0f;
-    signalSamples[i] = vgasMv - vrefMv;
-  }
-
-  vgasVolts = trimmedMean(vgasSamples, SO2_FILTER_SAMPLES, SO2_FILTER_DROP);
-  vrefVolts = trimmedMean(vrefSamples, SO2_FILTER_SAMPLES, SO2_FILTER_DROP);
-  signalMv = trimmedMean(signalSamples, SO2_FILTER_SAMPLES, SO2_FILTER_DROP);
-}
-
-static void so2ResetCalibration() {
-  so2CalCount = 0;
-  so2Healthy = false;
-  so2EmaInit = false;
-  so2BaselineSignalMv = 0.0f;
-  so2SmoothedMv = 0.0f;
-}
-
-static void so2CollectBaseline(float vgas, float vref) {
-  if (so2CalCount >= SO2_BASELINE_POINTS) return;
-  so2CalVgas[so2CalCount] = vgas;
-  so2CalVref[so2CalCount] = vref;
-  so2CalCount++;
-}
-
-static bool so2FinalizeBaseline() {
-  if (so2CalCount < SO2_BASELINE_POINTS) return false;
-
-  float minSignalMv = 9999.0f, maxSignalMv = -9999.0f;
-  float sumVgas = 0.0f, sumVref = 0.0f;
-  float sumSignalMv = 0.0f;
-  for (int i = 0; i < SO2_BASELINE_POINTS; i++) {
-    const float vgas = so2CalVgas[i];
-    const float vref = so2CalVref[i];
-    const float signalMv = so2_signal_mv(vgas, vref);
-    if (signalMv < minSignalMv) minSignalMv = signalMv;
-    if (signalMv > maxSignalMv) maxSignalMv = signalMv;
-    sumVgas += vgas;
-    sumVref += vref;
-    sumSignalMv += signalMv;
-  }
-
-  const float spanMv = maxSignalMv - minSignalMv;
-  Serial.printf("SO2 signal range during cal: %.3f to %.3f mV (span=%.3f mV)\n",
-                minSignalMv, maxSignalMv, spanMv);
-
-  if (spanMv > SO2_BASELINE_SPAN_LIMIT_MV) {
-    Serial.printf("!! SO2 baseline unstable (signal span > %.1f mV). Keep sensor in clean air and check wiring.\n",
-                  SO2_BASELINE_SPAN_LIMIT_MV);
-    so2ResetCalibration();
+static bool so2LinkChecksumOk(const char *body, const char *csHex) {
+  if (strlen(csHex) != 2 || !isxdigit((unsigned char)csHex[0]) || !isxdigit((unsigned char)csHex[1])) {
     return false;
   }
+  const uint8_t given = (uint8_t)strtol(csHex, nullptr, 16);
+  uint8_t cs = 0;
+  for (const char *p = body; *p != '\0'; p++) cs ^= (uint8_t)*p;
+  return cs == given;
+}
 
-  so2BaselineVgas = sumVgas / SO2_BASELINE_POINTS;
-  so2BaselineVref = sumVref / SO2_BASELINE_POINTS;
-  so2BaselineSignalMv = sumSignalMv / SO2_BASELINE_POINTS;
-  so2Healthy = true;
-  so2EmaInit = false;
-  so2SmoothedMv = 0.0f;
-  Serial.printf("SO2 baseline captured: Vgas0=%.4fV Vref0=%.4fV signal0=%.3f mV\n",
-                so2BaselineVgas, so2BaselineVref, so2BaselineSignalMv);
-  return true;
+// Reject anything outside the API's so2Status enum so a garbled status can
+// never reach the ingest endpoint and get the whole reading rejected.
+static bool so2LinkStatusValid(const char *status) {
+  return strcmp(status, "ok") == 0 ||
+         strcmp(status, "warming") == 0 ||
+         strcmp(status, "calibrating") == 0;
+}
+
+// Parses one newline-terminated line in place.
+static void so2LinkHandleLine(char *line) {
+  if (line[0] != '$') return; // node boot banner or serial noise — ignore quietly
+
+  char *star = strrchr(line, '*');
+  if (star == nullptr) {
+    so2LinkBadFrames++;
+    return;
+  }
+  *star = '\0';
+  char *body = line + 1;
+  if (!so2LinkChecksumOk(body, star + 1)) {
+    so2LinkBadFrames++;
+    return;
+  }
+
+  char *saveptr = nullptr;
+  const char *tag = strtok_r(body, ",", &saveptr);
+  if (tag == nullptr) {
+    so2LinkBadFrames++;
+    return;
+  }
+
+  if (strcmp(tag, "SO2BASE") == 0) {
+    const char *vgas0 = strtok_r(nullptr, ",", &saveptr);
+    const char *vref0 = strtok_r(nullptr, ",", &saveptr);
+    const char *sig0  = strtok_r(nullptr, ",", &saveptr);
+    if (vgas0 && vref0 && sig0) {
+      Serial.printf("SO2 node captured baseline: Vgas0=%sV Vref0=%sV signal0=%s mV\n", vgas0, vref0, sig0);
+    }
+    return;
+  }
+
+  if (strcmp(tag, "SO2") != 0) return;
+
+  // status, vgas, vref, delta_mv, ppb, warmup_left_s, cal_done, cal_total, uptime_s
+  const char *f[9];
+  for (int i = 0; i < 9; i++) {
+    f[i] = strtok_r(nullptr, ",", &saveptr);
+    if (f[i] == nullptr) {
+      so2LinkBadFrames++;
+      return;
+    }
+  }
+
+  if (!so2LinkStatusValid(f[0])) {
+    so2LinkBadFrames++;
+    return;
+  }
+
+  snprintf(so2LinkStatus, sizeof(so2LinkStatus), "%s", f[0]);
+  so2Vgas = atof(f[1]);
+  so2Vref = atof(f[2]);
+
+  // The node sends ppb = -1 until it is calibrated; keep those out of the payload.
+  const float ppb = atof(f[4]);
+  if (strcmp(so2LinkStatus, "ok") == 0 && ppb >= 0.0f) {
+    so2DeltaMv = atof(f[3]);
+    so2Ppb = ppb;
+  } else {
+    so2DeltaMv = NAN;
+    so2Ppb = NAN;
+  }
+
+  so2WarmupLeftSec = strtoul(f[5], nullptr, 10);
+  so2CalDone       = (uint16_t)strtoul(f[6], nullptr, 10);
+  so2CalTotal      = (uint16_t)strtoul(f[7], nullptr, 10);
+  so2NodeUptimeSec = strtoul(f[8], nullptr, 10);
+
+  if (!so2LinkSeen) {
+    Serial.printf("SO2 link established on GPIO%d (node uptime %lus, status=%s)\n",
+                  SO2_LINK_RX_PIN, (unsigned long)so2NodeUptimeSec, so2LinkStatus);
+  }
+  so2LinkSeen = true;
+  so2LinkLastFrameMs = millis();
+
+#if SO2_LINK_DEBUG
+  Serial.printf("SO2 link frame: status=%s vgas=%.4f vref=%.4f delta=%.3f ppb=%.1f\n",
+                so2LinkStatus, so2Vgas, so2Vref, so2DeltaMv, so2Ppb);
+#endif
+}
+
+// Call every loop so the Serial1 RX buffer never backs up.
+static void drainSo2LinkFrames() {
+  while (SO2_LINK_UART.available() > 0) {
+    const char c = (char)SO2_LINK_UART.read();
+    so2LinkBytesRx++;
+
+#if SO2_LINK_RAW_DEBUG
+    if (c >= 32 && c <= 126) {
+      Serial.write(c);
+    } else if (c == '\n') {
+      Serial.println();
+    } else if (c != '\r') {
+      Serial.printf("<%02X>", (uint8_t)c);
+    }
+#endif
+
+    if (c == '\r') continue;
+
+    if (c == '\n') {
+      if (so2LinkLineTooLong) {
+        so2LinkBadFrames++;
+      } else if (so2LinkLineLen > 0) {
+        so2LinkLine[so2LinkLineLen] = '\0';
+        so2LinkHandleLine(so2LinkLine);
+      }
+      so2LinkLineLen = 0;
+      so2LinkLineTooLong = false;
+      continue;
+    }
+
+    if (so2LinkLineLen + 1 >= SO2_LINK_LINE_MAX) {
+      so2LinkLineTooLong = true; // discard the rest of this oversized line
+      continue;
+    }
+    so2LinkLine[so2LinkLineLen++] = c;
+  }
+}
+
+static void drainPmFrames(); // defined with the Plantower parser below
+
+// delay() replacement for the long blocking waits in setup() and ensureWiFi().
+// A plain delay() lets both UART RX buffers fill and drop bytes, which shows up
+// later as malformed frames.
+static void serviceDelay(uint32_t ms) {
+  const uint32_t start = millis();
+  do {
+    drainSo2LinkFrames();
+    drainPmFrames();
+    delay(5);
+  } while (millis() - start < ms);
 }
 
 // ================= OBJECTS =================
@@ -471,14 +520,19 @@ static void flushOfflineBuffer() {
 
 // ================= TIME (NTP) =================
 static bool syncTime(uint32_t timeoutMs = 20000) {
+#if !WIFI_ENABLED
+  (void)timeoutMs;
+  return false;
+#else
   configTime(0, 0, "pool.ntp.org", "time.nist.gov");
   const uint32_t start = millis();
   struct tm t;
   while (millis() - start < timeoutMs) {
     if (getLocalTime(&t, 250)) return true;
-    delay(250);
+    serviceDelay(250);
   }
   return false;
+#endif
 }
 
 static bool iso8601UtcNow(char *out, size_t outSize) {
@@ -492,6 +546,9 @@ static bool iso8601UtcNow(char *out, size_t outSize) {
 
 // ================= WIFI =================
 static void ensureWiFi() {
+#if !WIFI_ENABLED
+  return;
+#else
   if (WiFi.status() == WL_CONNECTED) return;
 
   WiFi.mode(WIFI_STA);
@@ -500,7 +557,7 @@ static void ensureWiFi() {
   Serial.print("WiFi connecting");
   uint32_t start = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - start < 20000) {
-    delay(500);
+    serviceDelay(500);
     Serial.print(".");
   }
   Serial.println();
@@ -512,6 +569,7 @@ static void ensureWiFi() {
   } else {
     Serial.println("WiFi connect failed (will retry later)");
   }
+#endif
 }
 
 // ================= PLANTOWER PM (PMSx003 protocol) =================
@@ -586,25 +644,6 @@ static int analogReadAvgWithSamples(int pin, int sampleCount) {
 static int analogReadMilliVoltsAvgWithSamples(int pin, int sampleCount) {
   long sum = 0;
   for (int i = 0; i < sampleCount; i++) {
-    sum += analogReadMilliVolts(pin);
-  }
-  return (int)(sum / sampleCount);
-}
-
-// High-impedance sources such as ULPSM Vgas/Vref need the ESP32 ADC mux to
-// settle after each channel switch. Discard the first few conversions so the
-// next averaged samples reflect the actual pin voltage instead of the prior pin.
-static int analogReadMilliVoltsSettledWithSamples(int pin, int sampleCount, int discardCount, int settleUs) {
-  if (sampleCount <= 0) return 0;
-
-  for (int i = 0; i < discardCount; i++) {
-    (void)analogReadMilliVolts(pin);
-    if (settleUs > 0) delayMicroseconds(settleUs);
-  }
-
-  long sum = 0;
-  for (int i = 0; i < sampleCount; i++) {
-    if (settleUs > 0) delayMicroseconds(settleUs);
     sum += analogReadMilliVolts(pin);
   }
   return (int)(sum / sampleCount);
@@ -853,10 +892,15 @@ void setup() {
   rtcBootCount++;
   bootCount = rtcBootCount;
 
-  Serial.println("\nESP32 -> Air Quality API (BME680 + SCD40 + PM + SO2 + MiCS-6814)");
+  Serial.println("\nESP32 -> Air Quality API (BME680 + SCD40 + PM + SO2 link + MiCS-6814)");
   Serial.printf("Boot session #%lu | reset=%s\n", bootCount, resetReasonLabel(bootResetReason));
+#if WIFI_ENABLED
   Serial.print("Configured ingest URL: ");
   Serial.println(API_URL);
+#else
+  WiFi.mode(WIFI_OFF);
+  Serial.println("WIFI_ENABLED is 0 - radio off, local serial test mode (nothing is uploaded)");
+#endif
 
 #if BATTERY_MONITOR_ENABLED
   pinMode(CHARGER_RELAY_PIN, OUTPUT);
@@ -877,21 +921,25 @@ void setup() {
   Serial2.begin(PM_BAUD, SERIAL_8N1, PM_RX_PIN, PM_TX_PIN);
   Serial.println("Plantower UART initialized (Serial2)");
 
+  // ---------- SO2 node UART link ----------
+  SO2_LINK_UART.setRxBufferSize(SO2_LINK_RX_BUFFER);
+  SO2_LINK_UART.begin(SO2_LINK_BAUD, SERIAL_8N1, SO2_LINK_RX_PIN, SO2_LINK_TX_PIN);
+  Serial.printf("SO2 link listening on GPIO%d @ %lu baud (receive-only; wire SO2 node GPIO17 -> GPIO%d and share GND)\n",
+                SO2_LINK_RX_PIN, (unsigned long)SO2_LINK_BAUD, SO2_LINK_RX_PIN);
+  Serial.println("SO2 warm-up and baseline run on the SO2 node - this board only forwards its status.");
+#if SO2_LINK_RAW_DEBUG
+  Serial.println("SO2 link raw debug ON - every byte arriving on the link is echoed below.");
+#endif
+
   // ---------- ADC (ESP32 internal) ----------
   analogReadResolution(12);
-  analogSetPinAttenuation(SO2_VGAS_PIN, ADC_11db);
-  analogSetPinAttenuation(SO2_VREF_PIN, ADC_11db);
-#if SO2_HAS_VTEMP
-  analogSetPinAttenuation(SO2_VTEMP_PIN, ADC_11db);
-#endif
 #if BATTERY_MONITOR_ENABLED
   analogSetPinAttenuation(BATTERY_VOLTAGE_PIN, ADC_11db);
 #endif
   analogSetPinAttenuation(MICS_NH3_PIN, ADC_11db);
   analogSetPinAttenuation(MICS_CO_PIN, ADC_11db);
   analogSetPinAttenuation(MICS_NO2_PIN, ADC_11db);
-  so2BootMs = millis();
-  Serial.println("ADC configured: MiCS-6814 + ULPSM-SO2 + battery analog pins");
+  Serial.println("ADC configured: MiCS-6814 + battery analog pins");
   Serial.printf("MiCS load resistors: NH3=%.0f ohm CO=%.0f ohm NO2=%.0f ohm\n",
                 MICS_RLOAD_NH3_OHM, MICS_RLOAD_CO_OHM, MICS_RLOAD_NO2_OHM);
 
@@ -915,14 +963,16 @@ void setup() {
 
   ensureWiFi();
 
+#if WIFI_ENABLED
   Serial.print("Syncing time (NTP)...");
   if (syncTime()) Serial.println(" ok");
   else Serial.println(" failed (server will timestamp if ts omitted)");
+#endif
 
   // ---------- MiCS-6814 warm-up + R0 calibration ----------
   if (MICS_WARMUP_MS > 0) {
     Serial.printf("MiCS-6814 warm-up: %lu s before baseline capture\n", MICS_WARMUP_MS / 1000UL);
-    delay(MICS_WARMUP_MS);
+    serviceDelay(MICS_WARMUP_MS);
   }
 
   // Take 20 readings (1/sec). Average Rs from the last 10 as R0 (assumes clean air).
@@ -963,7 +1013,7 @@ void setup() {
       }
     }
 
-    if (i < 20) delay(1000);
+    if (i < 20) serviceDelay(1000);
   }
 
   micsCalibratedCO = calSamplesCO > 0;
@@ -986,21 +1036,13 @@ void setup() {
   } else {
     Serial.println("R0 calibration FAILED — no valid MiCS samples. Check wiring/load resistors.");
   }
-
-  if (SO2_TEST_MODE) {
-    Serial.printf("SO2 warm-up started (test mode: %lu min before baseline capture)\n",
-                  SO2_WARMUP_MS / 60000UL);
-    Serial.println("SO2 test mode is for quick checks only. Use 60 minutes for a real baseline.");
-  } else {
-    Serial.printf("SO2 warm-up started (production mode: %lu min before baseline capture)\n",
-                  SO2_WARMUP_MS / 60000UL);
-  }
 }
 
 // ================= LOOP =================
 void loop() {
-  // Always drain PM frames first (non-blocking, prevents Serial2 overflow)
+  // Always drain both UARTs first (non-blocking, prevents RX buffer overflow)
   drainPmFrames();
+  drainSo2LinkFrames();
 
 #if BATTERY_MONITOR_ENABLED
   updateChargerRelay(readBatteryVoltage(false));
@@ -1040,21 +1082,9 @@ void loop() {
   const uint16_t pm1 = latestPm1, pm25 = latestPm25, pm10 = latestPm10;
   pmHasData = false; // reset for next interval
 
-  // ---- Read SO2 via ESP32 ADC (ULPSM Vgas/Vref) ----
-  float so2Vgas = NAN, so2Vref = NAN, so2SignalMv = NAN;
-  readSo2Filtered(so2Vgas, so2Vref, so2SignalMv);
-  float so2DeltaMv = NAN;
-  if (so2WarmupComplete()) {
-    if (!so2Healthy) {
-      so2CollectBaseline(so2Vgas, so2Vref);
-      if (so2CalCount == SO2_BASELINE_POINTS) {
-        so2FinalizeBaseline();
-      }
-    }
-    if (so2Healthy) {
-      so2DeltaMv = so2SignalMv - so2BaselineSignalMv;
-    }
-  }
+  // ---- SO2: latest frame received from the SO2 node over Serial1 ----
+  const bool so2Online = so2LinkOnline();
+  const bool so2Ok = so2Ready();
 
   // ---- Read MiCS-6814 analog (averaged) ----
   const int micsNh3Raw = analogReadAvg(MICS_NH3_PIN);
@@ -1074,9 +1104,7 @@ void loop() {
   const float estCoPpm   = micsCO_ppm(micsCoVin);
   const float estNo2Ppb  = micsNO2_ppb(micsNo2Vin);
   const float estNh3Ppm  = micsNH3_ppm(micsNh3Vin);
-  const float estSo2Ppb  = so2_ppb_from_delta(so2DeltaMv);
   const uint32_t uptimeSec = millis() / 1000UL;
-  const char *so2Status = so2StatusLabel();
 
   // ---- Build JSON ----
   StaticJsonDocument<2048> doc;
@@ -1090,12 +1118,17 @@ void loop() {
     systemObj["uptimeSec"] = uptimeSec;
     systemObj["bootCount"] = bootCount;
     systemObj["resetReason"] = resetReasonLabel(bootResetReason);
-    systemObj["so2Status"] = so2Status;
-    if (!so2WarmupComplete()) {
-      systemObj["so2WarmupRemainingSec"] = so2WarmupRemainingSec();
-    } else if (!so2Healthy) {
-      systemObj["so2BaselineProgress"] = so2CalCount;
-      systemObj["so2BaselineTarget"] = SO2_BASELINE_POINTS;
+    // Mirror the SO2 node's own status. When the link is down the field is
+    // omitted entirely: the API enum only accepts warming/calibrating/ok, so
+    // sending "offline" would fail validation and drop the whole reading.
+    if (so2Online) {
+      systemObj["so2Status"] = so2LinkStatus;
+      if (strcmp(so2LinkStatus, "warming") == 0) {
+        systemObj["so2WarmupRemainingSec"] = so2WarmupLeftSec;
+      } else if (strcmp(so2LinkStatus, "calibrating") == 0) {
+        systemObj["so2BaselineProgress"] = so2CalDone;
+        systemObj["so2BaselineTarget"] = so2CalTotal;
+      }
     }
   }
 
@@ -1131,12 +1164,12 @@ void loop() {
     pmObj["pm10ugm3"] = pm10;
   }
 
-  if (so2Healthy) {
+  if (so2Ok) {
     JsonObject so2Obj = doc.createNestedObject("so2");
     so2Obj["vgas"] = so2Vgas;
     so2Obj["vref"] = so2Vref;
     so2Obj["mv"] = so2DeltaMv;
-    so2Obj["ppb"] = estSo2Ppb;
+    so2Obj["ppb"] = so2Ppb;
   }
 
   {
@@ -1153,6 +1186,10 @@ void loop() {
   serializeJson(doc, body);
 
   // ---- POST to API (or buffer if offline) ----
+#if !WIFI_ENABLED
+  Serial.print("PAYLOAD (not sent, WIFI_ENABLED=0) ");
+  Serial.println(body);
+#else
   if (WiFi.status() == WL_CONNECTED) {
     flushOfflineBuffer();
 
@@ -1186,6 +1223,7 @@ void loop() {
     bufferPayload(body);
     Serial.printf("WiFi down, buffered reading (%d/%d)\n", offlineCount, OFFLINE_BUF_SIZE);
   }
+#endif
 
   // ---- Local debug ----
   if (!bmePresent) {
@@ -1217,18 +1255,32 @@ void loop() {
                 bootCount,
                 uptimeSec,
                 resetReasonLabel(bootResetReason));
-  {
-    if (so2Healthy) {
-      Serial.printf("SO2     status=ok Vgas=%.4fV Vref=%.4fV delta=%+.3fmV est=%.1f ppb (ULPSM)\n",
-                    so2Vgas, so2Vref, so2DeltaMv, estSo2Ppb);
-    } else if (!so2WarmupComplete()) {
-      const uint32_t warmupLeftMin = (so2WarmupRemainingSec() + 59UL) / 60UL;
-      Serial.printf("SO2     status=warming Vgas=%.4fV Vref=%.4fV (%lu min left)\n",
-                    so2Vgas, so2Vref, warmupLeftMin);
+  if (!so2Online) {
+    if (so2LinkSeen) {
+      Serial.printf("SO2     status=offline (no frame for %lus on GPIO%d)\n",
+                    (unsigned long)((millis() - so2LinkLastFrameMs) / 1000UL), SO2_LINK_RX_PIN);
     } else {
-      Serial.printf("SO2     status=calibrating Vgas=%.4fV Vref=%.4fV signal=%+.3fmV (%u/%u)\n",
-                    so2Vgas, so2Vref, so2_signal_mv(so2Vgas, so2Vref), so2CalCount, SO2_BASELINE_POINTS);
+      Serial.printf("SO2     status=offline (nothing valid since boot - check SO2 node TX -> GPIO%d and common GND)\n",
+                    SO2_LINK_RX_PIN);
     }
+    // Byte count separates "no signal at all" (wiring, power, wrong pin) from
+    // "signal arrives but is unreadable" (baud mismatch, floating ground).
+    Serial.printf("SO2 link  rx=%lu bytes bad=%lu frames since boot\n",
+                  (unsigned long)so2LinkBytesRx, (unsigned long)so2LinkBadFrames);
+  } else if (so2Ok) {
+    Serial.printf("SO2     status=ok Vgas=%.4fV Vref=%.4fV delta=%+.3fmV est=%.1f ppb (node uptime %lus)\n",
+                  so2Vgas, so2Vref, so2DeltaMv, so2Ppb, (unsigned long)so2NodeUptimeSec);
+  } else if (strcmp(so2LinkStatus, "warming") == 0) {
+    Serial.printf("SO2     status=warming Vgas=%.4fV Vref=%.4fV (%lu min left on node)\n",
+                  so2Vgas, so2Vref, (unsigned long)((so2WarmupLeftSec + 59UL) / 60UL));
+  } else {
+    Serial.printf("SO2     status=calibrating Vgas=%.4fV Vref=%.4fV (%u/%u on node)\n",
+                  so2Vgas, so2Vref, so2CalDone, so2CalTotal);
+  }
+
+  if (so2Online && so2LinkBadFrames > 0) {
+    Serial.printf("SO2 link  rx=%lu bytes bad=%lu frames since boot\n",
+                  (unsigned long)so2LinkBytesRx, (unsigned long)so2LinkBadFrames);
   }
 
   if (MICS_DIVIDER_GAIN != 1.0f) {
@@ -1267,7 +1319,7 @@ void loop() {
                 !bmePresent ? "missing" : (bmeOk ? "ok" : "fault"),
                 !scdPresent ? "missing" : (scdOk ? "ok" : "waiting"),
                 pmOk ? "ok" : "waiting",
-                so2Healthy ? "ok" : (!so2WarmupComplete() ? "warming" : "calibrating"),
+                so2StatusLabel(),
                 micsRawStatusLabel(micsCoRaw),
                 micsRawStatusLabel(micsNh3Raw),
                 micsRawStatusLabel(micsNo2Raw));

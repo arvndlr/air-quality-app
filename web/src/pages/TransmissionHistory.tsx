@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { format, formatDistanceToNowStrict, formatISO, parseISO } from "date-fns";
 import {
   downloadTransmissionCsv,
@@ -15,6 +15,7 @@ import {
   defaultCustomEnd,
   defaultCustomStart,
   describeRange,
+  parseDateSearch,
   rangeOptions,
   resolveRange,
   toDateInputValue,
@@ -117,6 +118,8 @@ export function TransmissionHistory() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState<TransmissionExportMode | null>(null);
+  const [searchText, setSearchText] = useState("");
+  const [searchError, setSearchError] = useState<string | null>(null);
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
 
   const resolved = useMemo(() => resolveRange(range, customFrom, customTo), [range, customFrom, customTo]);
@@ -126,6 +129,31 @@ export function TransmissionHistory() {
   const windowLabel = describeRange(range, resolved.from, resolved.to);
   const todayValue = toDateInputValue(new Date());
   const selectedDevice = devices.find((device) => device.externalId === deviceId) ?? null;
+
+  function showDates(from: string, to: string) {
+    setRange("custom");
+    setCustomFrom(from);
+    setCustomTo(to);
+  }
+
+  function handleSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const result = parseDateSearch(searchText);
+
+    if ("error" in result) {
+      setSearchError(result.error);
+      return;
+    }
+
+    setSearchError(null);
+    showDates(result.from, result.to);
+  }
+
+  function clearSearch() {
+    setSearchText("");
+    setSearchError(null);
+    setRange("week");
+  }
 
   async function handleExport(mode: TransmissionExportMode) {
     if (!fromIso || !toIso) return;
@@ -243,6 +271,31 @@ export function TransmissionHistory() {
           </div>
         </header>
 
+        <form className="history-search" role="search" onSubmit={handleSearch}>
+          <label className="history-search__field">
+            <span>Search by date</span>
+            <input
+              type="search"
+              value={searchText}
+              placeholder="e.g. 2026-09-15, Sep 15, 9/15/2026, Sep 2026, or Sep 1 to Sep 5"
+              aria-invalid={searchError != null}
+              onChange={(event) => {
+                setSearchText(event.target.value);
+                if (searchError) setSearchError(null);
+              }}
+            />
+          </label>
+          <button className="report-print-button" type="submit">
+            Search
+          </button>
+          {(searchText || range === "custom") && (
+            <button className="date-search-bar__reset" type="button" onClick={clearSearch}>
+              Clear
+            </button>
+          )}
+          {searchError && <div className="history-search__error">{searchError}</div>}
+        </form>
+
         <div className="date-search-bar">
           {range === "custom" ? (
             <div className="date-search-bar__fields">
@@ -278,7 +331,7 @@ export function TransmissionHistory() {
             </div>
           ) : (
             <div className="date-search-bar__hint">
-              Choose <strong>Custom dates</strong> to search a specific day or date range.
+              Use the search above, or choose <strong>Custom dates</strong>, to trace back a specific day or date range.
             </div>
           )}
 
@@ -391,6 +444,19 @@ export function TransmissionHistory() {
                           <span>
                             {formatDateTime(day.firstTs)} to {formatDateTime(day.lastTs)}
                           </span>
+                          {history.daily.length > 1 && (
+                            <button
+                              className="history-day-link"
+                              type="button"
+                              onClick={() => {
+                                setSearchText(day.day);
+                                setSearchError(null);
+                                showDates(day.day, day.day);
+                              }}
+                            >
+                              View this day's log
+                            </button>
+                          )}
                         </div>
                       </td>
                       <td>

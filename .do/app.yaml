@@ -41,7 +41,7 @@ services:
 static_sites:
   - name: web
     git:
-      repo_clone_url: https://github.com/REPLACE_WITH_YOUR_ACCOUNT/REPLACE_WITH_YOUR_REPO.git
+      repo_clone_url: https://github.com/arvndlr/air-quality-app
       branch: main
     source_dir: /web
     environment_slug: node-js

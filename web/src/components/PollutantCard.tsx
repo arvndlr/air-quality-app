@@ -791,11 +791,6 @@ export function PollutantCard(props: {
             {indicator.summary}
           </div>
         )}
-        {hoverEnabled && (
-          <div className={`pollutant-stat-card__risk pollutant-stat-card__risk--${tier}`}>
-            {tier === "moderate" ? "Rising: hover for effects & remedies" : "Warning: hover for effects & remedies"}
-          </div>
-        )}
       </div>
 
       {details && tier && guidance && !open && anchor && (

@@ -192,6 +192,244 @@ const pollutantDetails: Record<string, PollutantInfo> = {
   },
 };
 
+/** How far a pollutant has risen above "Good"; the hover guidance only appears for these. */
+type RiskTier = "moderate" | "unhealthy" | "severe";
+
+type LevelGuidance = {
+  /** What the body may experience at this level. */
+  effects: string[];
+  /** What to do about it at this level. */
+  remedies: string[];
+};
+
+function getRiskTier(categoryLabel: string | null | undefined): RiskTier | null {
+  if (categoryLabel === "Moderate") return "moderate";
+  if (categoryLabel === "Unhealthy for Sensitive Groups" || categoryLabel === "Unhealthy") return "unhealthy";
+  if (categoryLabel === "Very Unhealthy" || categoryLabel === "Hazardous") return "severe";
+  return null;
+}
+
+const tierLeads: Record<RiskTier, string> = {
+  moderate: "Levels are rising. Most people are fine, but sensitive people may start to notice effects.",
+  unhealthy: "Levels are unhealthy. Sensitive groups are affected and others may begin to feel symptoms.",
+  severe: "Levels are dangerous. Everyone is at risk of serious health effects.",
+};
+
+const levelGuidance: Record<string, Record<RiskTier, LevelGuidance>> = {
+  "PM<sub>2.5</sub>": {
+    moderate: {
+      effects: [
+        "Coughing or throat irritation in unusually sensitive people",
+        "Mild symptoms for people with asthma or heart disease",
+      ],
+      remedies: [
+        "Sensitive people should shorten long or heavy outdoor exertion",
+        "Keep windows closed near traffic, smoke, or burning",
+      ],
+    },
+    unhealthy: {
+      effects: [
+        "Coughing, wheezing, and asthma attacks",
+        "Aggravated bronchitis and COPD",
+        "Chest discomfort, palpitations, or irregular heartbeat in people with heart disease",
+      ],
+      remedies: [
+        "Wear a well-fitted N95/KN95 mask outdoors",
+        "Move activities indoors and run a HEPA air purifier",
+        "Keep asthma inhalers and heart medication at hand",
+      ],
+    },
+    severe: {
+      effects: [
+        "Serious worsening of heart and lung disease",
+        "Raised risk of heart attack and stroke",
+        "Lung damage and lung cancer risk with long-term exposure",
+      ],
+      remedies: [
+        "Everyone should stay indoors with doors and windows shut",
+        "Run HEPA purifiers and avoid smoking, frying, or candles indoors",
+        "Seek medical care for chest pain, breathlessness, or palpitations",
+      ],
+    },
+  },
+  "PM<sub>10</sub>": {
+    moderate: {
+      effects: ["Mild eye, nose, and throat irritation in sensitive people", "Occasional coughing or sneezing"],
+      remedies: ["Sensitive people should limit long outdoor exertion", "Keep windows closed on dusty or windy days"],
+    },
+    unhealthy: {
+      effects: ["Coughing, sneezing, and sore throat", "Sinus congestion and eye irritation", "Asthma attacks and worsened bronchitis"],
+      remedies: [
+        "Wear an N95 dust mask outdoors",
+        "Wet-mop instead of sweeping and damp down dusty areas",
+        "Rinse eyes and nose with clean water after exposure",
+      ],
+    },
+    severe: {
+      effects: ["Shortness of breath even in healthy people", "Serious aggravation of asthma and COPD", "Airway inflammation"],
+      remedies: [
+        "Stay indoors and seal gaps around doors and windows",
+        "Pause construction, sweeping, or other dust-raising work",
+        "Seek medical help if breathing becomes difficult",
+      ],
+    },
+  },
+  "SO<sub>2</sub>": {
+    moderate: {
+      effects: ["Chest tightness or wheezing during exertion for people with asthma", "Mild eye and throat irritation"],
+      remedies: [
+        "People with asthma should limit outdoor exertion and carry an inhaler",
+        "Keep windows closed near industrial or burning sources",
+      ],
+    },
+    unhealthy: {
+      effects: [
+        "Airway narrowing within minutes for people with asthma",
+        "Wheezing, chest tightness, and shortness of breath",
+        "Coughing and airway irritation",
+      ],
+      remedies: [
+        "Stay indoors, away from industrial areas and exhaust",
+        "Use the prescribed reliever inhaler at the first symptoms",
+        "Avoid outdoor exercise until levels drop",
+      ],
+    },
+    severe: {
+      effects: [
+        "Severe asthma attacks that may need emergency care",
+        "Breathing difficulty even in healthy people",
+        "Airway inflammation and more respiratory infections",
+      ],
+      remedies: [
+        "Everyone should stay indoors with windows closed",
+        "Report the source to local environmental authorities",
+        "Seek emergency care for severe breathing difficulty",
+      ],
+    },
+  },
+  CO: {
+    moderate: {
+      effects: ["Reduced exercise tolerance for people with heart disease", "Possible mild headache in enclosed spaces"],
+      remedies: [
+        "Check that gas stoves, heaters, and generators are vented",
+        "Do not idle vehicles in garages or enclosed areas",
+      ],
+    },
+    unhealthy: {
+      effects: ["Headache, dizziness, and fatigue", "Nausea and confusion", "Chest pain (angina) in people with heart disease"],
+      remedies: [
+        "Open windows and doors to ventilate immediately",
+        "Switch off fuel-burning appliances and engines",
+        "Move children, pregnant people, and people with heart disease to fresh air",
+      ],
+    },
+    severe: {
+      effects: [
+        "Vomiting, confusion, and loss of consciousness",
+        "Carbon monoxide poisoning, which can be fatal",
+        "Harm to a developing foetus",
+      ],
+      remedies: [
+        "Evacuate the area and get to fresh air now",
+        "Call emergency services; oxygen treatment may be needed",
+        "Do not go back in until the source is found and fixed",
+      ],
+    },
+  },
+  "NO<sub>2</sub>": {
+    moderate: {
+      effects: ["Airway irritation for people with asthma", "Mild coughing near heavy traffic"],
+      remedies: ["Sensitive people should avoid busy roads during rush hours", "Ventilate the kitchen when using a gas stove"],
+    },
+    unhealthy: {
+      effects: ["Airway inflammation and coughing", "Asthma attacks, especially in children", "Lower resistance to respiratory infections"],
+      remedies: [
+        "Limit time outdoors near traffic",
+        "Keep windows closed and use an activated-carbon air purifier",
+        "Keep asthma medication available",
+      ],
+    },
+    severe: {
+      effects: ["Serious breathing difficulty and wheezing", "Higher risk of bronchitis and pneumonia", "Worsened chronic lung disease"],
+      remedies: [
+        "Everyone should stay indoors",
+        "Stop indoor combustion such as gas stoves and unvented heaters",
+        "Seek medical care for breathing difficulty",
+      ],
+    },
+  },
+  "NH<sub>3</sub>": {
+    moderate: {
+      effects: ["Noticeable pungent odour", "Mild eye and nose irritation"],
+      remedies: ["Look for nearby sources such as waste, fertiliser, or cleaning chemicals", "Improve ventilation"],
+    },
+    unhealthy: {
+      effects: ["Burning eyes, nose, and throat", "Coughing and hoarseness", "Chest tightness"],
+      remedies: [
+        "Leave the area and ventilate it",
+        "Rinse eyes and skin with plenty of clean water",
+        "Stop or contain the source (leak, waste, or chemicals)",
+      ],
+    },
+    severe: {
+      effects: ["Chemical bronchitis and airway swelling", "Fluid in the lungs (pulmonary oedema)", "Chemical burns to eyes and skin"],
+      remedies: [
+        "Evacuate immediately and move upwind",
+        "Flush eyes and skin with water for at least 15 minutes",
+        "Call emergency services and report the leak",
+      ],
+    },
+  },
+  "CO<sub>2</sub>": {
+    moderate: {
+      effects: ["Stuffy air and mild drowsiness", "Slightly reduced concentration"],
+      remedies: ["Open a window or door", "Take short fresh-air breaks"],
+    },
+    unhealthy: {
+      effects: ["Headaches and drowsiness", "Poor concentration and slower decision-making", "Easier spread of airborne infections"],
+      remedies: [
+        "Increase ventilation or turn on exhaust fans",
+        "Reduce the number of people in the room",
+        "Move activities to a better-ventilated space",
+      ],
+    },
+    severe: {
+      effects: ["Dizziness, restlessness, and tingling", "Raised heart and breathing rate", "Serious impairment at very high levels"],
+      remedies: [
+        "Leave the room and get fresh air",
+        "Check for faulty combustion equipment or other CO₂ sources",
+        "Ventilate thoroughly before returning",
+      ],
+    },
+  },
+  VOC: {
+    moderate: {
+      effects: ["Faint chemical odour", "Mild eye or throat irritation in sensitive people"],
+      remedies: ["Ventilate after cleaning, painting, or cooking", "Store solvents and fuels in sealed containers"],
+    },
+    unhealthy: {
+      effects: ["Headaches, dizziness, and fatigue", "Eye, nose, and throat irritation", "Triggered asthma and allergy symptoms"],
+      remedies: [
+        "Find and remove the source (paint, solvents, smoke, or fuel)",
+        "Open windows and run exhaust fans",
+        "Use an activated-carbon air purifier",
+      ],
+    },
+    severe: {
+      effects: [
+        "Nausea and loss of coordination",
+        "Possible liver, kidney, or nervous system harm with repeated exposure",
+        "Cancer risk from certain VOCs such as benzene and formaldehyde",
+      ],
+      remedies: [
+        "Leave the area and ventilate it fully",
+        "Stop the activity producing the fumes",
+        "Seek medical help for persistent symptoms",
+      ],
+    },
+  },
+};
+
 function buildSupplementalIndicator(
   value: number | null,
   interpolationMax: number,
@@ -305,11 +543,12 @@ function HealthTooltip(props: {
   title: string;
   categoryLabel: string | null;
   color: string;
-  concerning: boolean;
+  tier: RiskTier;
   details: PollutantInfo;
+  guidance: LevelGuidance;
   anchor: AnchorRect;
 }) {
-  const { title, categoryLabel, color, concerning, details, anchor } = props;
+  const { title, categoryLabel, color, tier, details, guidance, anchor } = props;
   const tooltipRef = useRef<HTMLDivElement | null>(null);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
 
@@ -341,7 +580,7 @@ function HealthTooltip(props: {
   return (
     <div
       ref={tooltipRef}
-      className={`health-tooltip${concerning ? " health-tooltip--alert" : ""}`}
+      className={`health-tooltip health-tooltip--${tier}`}
       role="tooltip"
       style={{
         top: position?.top ?? 0,
@@ -360,20 +599,28 @@ function HealthTooltip(props: {
       </div>
 
       <div className="health-tooltip__lead">
-        {concerning ? details.whenElevated : "Health effects linked to raised levels of this pollutant:"}
+        {tierLeads[tier]}
+        {tier !== "moderate" && ` ${details.whenElevated}`}
       </div>
 
-      <div className="health-tooltip__section-label">Possible illnesses and health effects</div>
+      <div className="health-tooltip__section-label">Possible harmful effects on the body</div>
       <ul className="health-tooltip__list">
-        {details.illnesses.map((illness) => (
-          <li key={illness}>{illness}</li>
+        {guidance.effects.map((effect) => (
+          <li key={effect}>{effect}</li>
+        ))}
+      </ul>
+
+      <div className="health-tooltip__section-label health-tooltip__section-label--remedy">What to do</div>
+      <ul className="health-tooltip__list health-tooltip__list--remedy">
+        {guidance.remedies.map((remedy) => (
+          <li key={remedy}>{remedy}</li>
         ))}
       </ul>
 
       <div className="health-tooltip__section-label">Most at risk</div>
       <div className="health-tooltip__text">{details.sensitiveGroups}</div>
 
-      <div className="health-tooltip__footer">Click the card for thresholds and recommendations.</div>
+      <div className="health-tooltip__footer">Click the card for thresholds and full details.</div>
     </div>
   );
 }
@@ -472,12 +719,16 @@ export function PollutantCard(props: {
   const color = indicator?.color ?? "#888";
   const details = pollutantDetails[title];
   const concerning = indicator != null && concerningCategories.has(indicator.label);
+  // The hover guidance only exists once the reading rises above "Good".
+  const tier = loading ? null : getRiskTier(indicator?.label);
+  const guidance = tier ? levelGuidance[title]?.[tier] ?? null : null;
+  const hoverEnabled = details != null && tier != null && guidance != null;
 
   const showTooltip = useCallback(() => {
     const card = cardRef.current;
-    if (!card) return;
+    if (!card || !hoverEnabled) return;
     setAnchor(toAnchorRect(card.getBoundingClientRect()));
-  }, []);
+  }, [hoverEnabled]);
 
   const hideTooltip = useCallback(() => setAnchor(null), []);
 
@@ -485,6 +736,11 @@ export function PollutantCard(props: {
     setAnchor(null);
     setOpen(true);
   }, []);
+
+  // A live reading can drop back to "Good" while the tooltip is showing.
+  useEffect(() => {
+    if (!hoverEnabled) setAnchor(null);
+  }, [hoverEnabled]);
 
   // The tooltip is placed against the viewport, so it has to be dismissed if the page moves under it.
   useEffect(() => {
@@ -503,7 +759,9 @@ export function PollutantCard(props: {
     <>
       <div
         ref={cardRef}
-        className={`pollutant-stat-card${concerning ? " pollutant-stat-card--alert" : ""}`}
+        className={`pollutant-stat-card${concerning ? " pollutant-stat-card--alert" : ""}${
+          hoverEnabled ? ` pollutant-stat-card--hoverable pollutant-stat-card--${tier}` : ""
+        }`}
         onClick={() => openModal()}
         role="button"
         tabIndex={0}
@@ -533,20 +791,16 @@ export function PollutantCard(props: {
             {indicator.summary}
           </div>
         )}
-        {details && (
-          <div className={`pollutant-stat-card__risk${concerning ? " pollutant-stat-card__risk--alert" : ""}`}>
-            {concerning ? "Hover: possible illnesses" : "Hover for health effects"}
-          </div>
-        )}
       </div>
 
-      {details && !open && anchor && (
+      {details && tier && guidance && !open && anchor && (
         <HealthTooltip
           title={title}
           categoryLabel={indicator?.label ?? null}
           color={color}
-          concerning={concerning}
+          tier={tier}
           details={details}
+          guidance={guidance}
           anchor={anchor}
         />
       )}

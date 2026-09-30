@@ -1,4 +1,17 @@
-import { endOfDay, format, isValid, parseISO, startOfDay, subDays, subMonths, subWeeks } from "date-fns";
+import {
+  endOfDay,
+  endOfMonth,
+  format,
+  isValid,
+  parse,
+  parseISO,
+  startOfDay,
+  startOfMonth,
+  subDays,
+  subMonths,
+  subWeeks,
+  subYears
+} from "date-fns";
 
 export type RangeKey = "day" | "week" | "month" | "custom";
 
@@ -56,6 +69,91 @@ export function resolveRange(range: RangeKey, customFrom: string, customTo: stri
   }
 
   return { from, to, error: null };
+}
+
+export type DateSearchResult = { from: string; to: string } | { error: string };
+
+// Tried in order. Formats without a year fall back to the most recent matching date.
+const daySearchFormats = [
+  "yyyy-MM-dd",
+  "yyyy/MM/dd",
+  "M/d/yyyy",
+  "M-d-yyyy",
+  "MMM d yyyy",
+  "MMMM d yyyy",
+  "d MMM yyyy",
+  "d MMMM yyyy",
+  "MMM d",
+  "MMMM d",
+  "d MMM",
+  "d MMMM",
+  "M/d"
+];
+const monthSearchFormats = ["yyyy-MM", "yyyy/MM", "MMM yyyy", "MMMM yyyy", "M/yyyy"];
+
+function normalizeSearchText(text: string) {
+  return text
+    .trim()
+    .replace(/,/g, " ")
+    .replace(/(\d+)(st|nd|rd|th)\b/gi, "$1")
+    .replace(/\bsept\b/gi, "Sep")
+    .replace(/\s+/g, " ");
+}
+
+function hasYear(pattern: string) {
+  return pattern.includes("yyyy");
+}
+
+/** Parses one side of a search, returning the whole local day (or month) it names. */
+function parseSearchTerm(term: string): { from: Date; to: Date } | null {
+  const now = new Date();
+  const text = normalizeSearchText(term);
+  const lower = text.toLowerCase();
+
+  if (lower === "today") return { from: startOfDay(now), to: endOfDay(now) };
+  if (lower === "yesterday") {
+    const day = subDays(now, 1);
+    return { from: startOfDay(day), to: endOfDay(day) };
+  }
+
+  for (const pattern of daySearchFormats) {
+    let parsed = parse(text, pattern, now);
+    if (!isValid(parsed)) continue;
+    if (!hasYear(pattern) && parsed > now) parsed = subYears(parsed, 1);
+    return { from: startOfDay(parsed), to: endOfDay(parsed) };
+  }
+
+  for (const pattern of monthSearchFormats) {
+    const parsed = parse(text, pattern, now);
+    if (!isValid(parsed)) continue;
+    return { from: startOfMonth(parsed), to: endOfMonth(parsed) };
+  }
+
+  return null;
+}
+
+/**
+ * Turns free text from the history search bar into custom `yyyy-MM-dd` bounds.
+ * Accepts a single day ("2026-09-15", "Sep 15", "9/15/2026", "yesterday"), a month
+ * ("Sep 2026", "2026-09"), or a range of either joined by "to" or " - ".
+ */
+export function parseDateSearch(query: string): DateSearchResult {
+  const text = query.trim();
+  if (!text) return { error: "Type a date to search, for example 2026-09-15 or Sep 15." };
+
+  const parts = text.split(/\s+(?:to|until|through|-|–|—)\s+/i);
+  if (parts.length > 2) return { error: "Search one date or a single range like \"Sep 1 to Sep 5\"." };
+
+  const start = parseSearchTerm(parts[0]);
+  const end = parts.length === 2 ? parseSearchTerm(parts[1]) : start;
+
+  if (!start || !end) {
+    return { error: `Couldn't read "${text}" as a date. Try 2026-09-15, Sep 15 2026, or 9/15/2026.` };
+  }
+
+  if (start.from > end.to) return { error: "The start date must be on or before the end date." };
+
+  return { from: toDateInputValue(start.from), to: toDateInputValue(end.to) };
 }
 
 /** Human-readable description of the active window, used in headers and report metadata. */

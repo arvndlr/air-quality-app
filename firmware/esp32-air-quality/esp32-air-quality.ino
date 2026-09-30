@@ -47,6 +47,7 @@
 
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
@@ -60,6 +61,17 @@
 
 // Credentials & endpoint — keep out of version control
 #include "secrets.h"
+
+// https:// URLs (e.g. the DigitalOcean deployment) need a TLS client; http:// (LAN) uses the plain one.
+// setInsecure() skips certificate checks so no CA bundle has to be flashed.
+static WiFiClientSecure apiTlsClient;
+static bool beginApi(HTTPClient &http) {
+  if (strncmp(API_URL, "https://", 8) == 0) {
+    apiTlsClient.setInsecure();
+    return http.begin(apiTlsClient, API_URL);
+  }
+  return http.begin(API_URL);
+}
 
 // ================= BENCH TEST SWITCHES =================
 // Set WIFI_ENABLED to 0 to run completely offline: no WiFi, no NTP, no HTTP
@@ -498,7 +510,7 @@ static void flushOfflineBuffer() {
     HTTPClient http;
     http.setConnectTimeout(4000);
     http.setTimeout(6000);
-    http.begin(API_URL);
+    beginApi(http);
     http.addHeader("Content-Type", "application/json");
     http.addHeader("X-API-Key", API_KEY);
     int code = http.POST(offlineBuf[idx]);
@@ -1197,7 +1209,7 @@ void loop() {
     http.setConnectTimeout(4000);
     http.setTimeout(6000);
 
-    http.begin(API_URL);
+    beginApi(http);
     http.addHeader("Content-Type", "application/json");
     http.addHeader("X-API-Key", API_KEY);
 

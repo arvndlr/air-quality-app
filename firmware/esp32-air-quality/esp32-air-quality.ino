@@ -24,9 +24,9 @@
 //   running firmware/esp32-so2-only, which streams readings in over UART:
 //     SO2 node GPIO17 (TX) -> this board GPIO25 (Serial1 RX)
 //     SO2 node GND         -> this board GND    (REQUIRED common ground)
-//   GPIO34/35 are now free on this board — the ULPSM analog lines belong to
-//   the SO2 node only.
-// - MiCS-6814: CO -> GPIO32, NO2 -> GPIO33, NH3 -> GPIO36 
+//   The ULPSM analog lines belong to the SO2 node only.
+// - MiCS-6814: CO -> GPIO33, NO2 -> GPIO34, NH3 -> GPIO32 (all ADC1; GPIO35/36 free)
+// - MiCS recalibration button: BOOT button (GPIO0), press after startup in clean air
 // - Battery voltage sensor OUT -> GPIO39 (ADC1, input only)
 // - Charger relay IN -> GPIO26
 //
@@ -40,10 +40,15 @@
 //   or voltage-sensor module that keeps the ESP32 ADC input at or below 3.3V.
 //
 // MiCS-6814 HARDWARE NOTES:
-//   * Each analog line needs a pull-up resistor to 3.3V.
-//   * NH3 often needs a larger pull-up than CO/NO2 to avoid riding the ADC high rail in clean air.
-//   * If the board is powered at 5V, add voltage dividers to keep ADC inputs <= 3.3V.
+//   * Heater (VCC) on 5V; sensor GND, 5V supply GND and ESP32 GND must be joined.
+//   * The module has no load resistors: each output needs one to 3.3V (NOT 5V):
+//       CO 47k, NO2 10k, NH3 47k. Outputs then go straight to the ADC pins and can
+//       never exceed 3.3V, so no voltage dividers are needed.
+//   * Each sensing element sits between its output pin and GND, so
+//       Vout = 3.3V * Rs / (Rs + Rload).
 //   * All three pins must be on ADC1 — ADC2 is unusable while WiFi is active.
+//   * R0 (clean-air resistance) is measured once after warm-up and saved to flash.
+//     Press BOOT in clean air to re-measure it (e.g. after the 24 h burn-in).
 
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -54,6 +59,7 @@
 #include <Adafruit_BME680.h>
 #include <SparkFun_SCD4x_Arduino_Library.h>
 #include <esp_system.h>
+#include <Preferences.h>
 #include <time.h>
 #include <string.h>
 #include <ctype.h>
@@ -135,19 +141,24 @@ static const size_t SO2_LINK_RX_BUFFER = 1024;
 #define CHARGER_RELAY_ACTIVE_LOW 1
 
 // CJMCU-6814 (MiCS-6814) analog pins (ADC1 only — ADC2 unusable with WiFi)
-#define MICS_CO_PIN  32
-#define MICS_NO2_PIN 33
-#define MICS_NH3_PIN 36
+// Never GPIO25 (SO2 link RX) or any ADC2 pin.
+#define MICS_CO_PIN  33
+#define MICS_NO2_PIN 34
+#define MICS_NH3_PIN 32
 
-#define MICS_WARMUP_MS 30000
+#define MICS_RECAL_BUTTON_PIN 0 // BOOT button
 
-// MiCS module is powered at 5V and each analog output is scaled down to the
-// ESP32 ADC through a 100k/100k divider, so the ADC sees half of the sensor
-// output voltage.
-static const float MICS_DIVIDER_GAIN = 2.0f;
-static const float MICS_RLOAD_CO_OHM = 100000.0f;
+// Heater warm-up after power-on before readings/calibration are trusted.
+// Other sensors keep reporting during this time; MiCS ppm fields are omitted.
+static const uint32_t MICS_WARMUP_MS = 3UL * 60UL * 1000UL;
+static const int MICS_CAL_SAMPLES = 30; // 1 sample/second
+
+// Load resistors to 3.3V (ohms) and the supply they connect to (mV).
+// For best accuracy, measure the 3V3 pin with a multimeter and put the value here.
+static const float MICS_RLOAD_CO_OHM = 47000.0f;
 static const float MICS_RLOAD_NO2_OHM = 10000.0f;
-static const float MICS_RLOAD_NH3_OHM = 100000.0f;
+static const float MICS_RLOAD_NH3_OHM = 47000.0f;
+static const float MICS_VS_MV = 3300.0f;
 static const uint32_t I2C_CLOCK_HZ = 100000;
 static const uint16_t I2C_TIMEOUT_MS = 100;
 static const int MICS_RAIL_LOW_RAW = 8;
@@ -187,49 +198,41 @@ static float micsR0_NH3 = 1.0f;
 static bool  micsCalibratedCO = false;
 static bool  micsCalibratedNO2 = false;
 static bool  micsCalibratedNH3 = false;
+static bool  micsWarmedUp = false;
+static Preferences micsPrefs;
 
-// Convert output voltage to sensor resistance (Rs).
-// Pull-up to 3.3V forms a voltage divider: Vout = 3.3 * Rs / (Rs + Rload)
-// => Rs = Rload * Vout / (3.3 - Vout)
-static float voltageToRs(float vOut, float rLoadOhms) {
-  if (vOut >= 3.29f) return 0.01f;       // sensor fully open
-  if (vOut <= 0.01f) return 1000000.0f;  // sensor fully shorted
-  return rLoadOhms * vOut / (3.3f - vOut);
+// Convert output voltage (mV at the ADC pin) to sensor resistance (Rs).
+// Element between pin and GND, load resistor between pin and VS:
+// Vout = VS * Rs / (Rs + Rload)  =>  Rs = Rload * Vout / (VS - Vout)
+static float voltageToRs(float vOutMv, float rLoadOhms) {
+  const float v = constrain(vOutMv, 1.0f, MICS_VS_MV - 1.0f);
+  return rLoadOhms * v / (MICS_VS_MV - v);
 }
 
 // ---- ppm/ppb conversion from Rs/R0 ratio (power-law curves) ----
-// Source: MiCS-6814 datasheet typical sensitivity curves
-static float micsCO_ppm(float vOut) {
+// Approximate MiCS-6814 datasheet typical sensitivity curves.
+// Note: ratio=1.0 (clean air at calibration) maps to the curves' own baseline
+// (~4.4 ppm CO, ~146 ppb NO2, ~0.68 ppm NH3), not to zero.
+static float micsRatio(float vOutMv, float rLoadOhms, float r0) {
+  return voltageToRs(vOutMv, rLoadOhms) / r0;
+}
+
+static float micsCO_ppm(float vOutMv) {
   if (!micsCalibratedCO) return -1.0f;
-  float rs = voltageToRs(vOut, MICS_RLOAD_CO_OHM);
-  float ratio = rs / micsR0_CO;
-  if (ratio <= 0.0f) return -1.0f;
-  // Subtract 1.0 so ratio=1.0 (clean air baseline) maps to 0 ppm
-  float ppm = 4.385f * (powf(ratio, -1.179f) - 1.0f);
-  if (ppm < 0.0f) return 0.0f;
-  return fminf(ppm, 100.0f);
+  const float ratio = micsRatio(vOutMv, MICS_RLOAD_CO_OHM, micsR0_CO);
+  return fminf(4.385f * powf(ratio, -1.179f), 100.0f);
 }
 
-static float micsNO2_ppb(float vOut) {
+static float micsNO2_ppb(float vOutMv) {
   if (!micsCalibratedNO2) return -1.0f;
-  float rs = voltageToRs(vOut, MICS_RLOAD_NO2_OHM);
-  float ratio = rs / micsR0_NO2;
-  if (ratio <= 0.0f) return -1.0f;
-  // Subtract 1.0 so ratio=1.0 (clean air baseline) maps to 0 ppb
-  float ppb = 0.1459f * (powf(ratio, 1.007f) - 1.0f) * 1000.0f;
-  if (ppb < 0.0f) return 0.0f;
-  return fminf(ppb, 2500.0f);
+  const float ratio = micsRatio(vOutMv, MICS_RLOAD_NO2_OHM, micsR0_NO2);
+  return fminf(powf(ratio, 1.007f) / 6.855f * 1000.0f, 2500.0f);
 }
 
-static float micsNH3_ppm(float vOut) {
+static float micsNH3_ppm(float vOutMv) {
   if (!micsCalibratedNH3) return -1.0f;
-  float rs = voltageToRs(vOut, MICS_RLOAD_NH3_OHM);
-  float ratio = rs / micsR0_NH3;
-  if (ratio <= 0.0f) return -1.0f;
-  // Subtract 1.0 so ratio=1.0 (clean air baseline) maps to 0 ppm
-  float ppm = 0.6803f * (powf(ratio, -1.67f) - 1.0f);
-  if (ppm < 0.0f) return 0.0f;
-  return fminf(ppm, 500.0f);
+  const float ratio = micsRatio(vOutMv, MICS_RLOAD_NH3_OHM, micsR0_NH3);
+  return fminf(powf(ratio, -1.67f) / 1.47f, 500.0f);
 }
 
 // ================= ULPSM-SO2 state (mirrored from the SO2 node) =================
@@ -665,10 +668,6 @@ static int analogReadAvg(int pin) {
   return analogReadAvgWithSamples(pin, ADC_SAMPLES);
 }
 
-static float adcToVolts(int raw) {
-  return (float)raw * (3.3f / 4095.0f);
-}
-
 static int chargerRelayLevel(bool on) {
   if (CHARGER_RELAY_ACTIVE_LOW) return on ? LOW : HIGH;
   return on ? HIGH : LOW;
@@ -789,8 +788,100 @@ static const char *micsEstimateStatusLabel(bool channelCalibrated, bool rawOk, f
   return "ok";
 }
 
-static float micsSensorSideVoltage(float adcVoltage) {
-  return adcVoltage * MICS_DIVIDER_GAIN;
+static int micsReadMilliVolts(int pin) {
+  return analogReadMilliVoltsAvgWithSamples(pin, ADC_SAMPLES);
+}
+
+static void micsSaveR0() {
+  micsPrefs.putFloat("r0_co", micsCalibratedCO ? micsR0_CO : 0.0f);
+  micsPrefs.putFloat("r0_no2", micsCalibratedNO2 ? micsR0_NO2 : 0.0f);
+  micsPrefs.putFloat("r0_nh3", micsCalibratedNH3 ? micsR0_NH3 : 0.0f);
+}
+
+static void micsLoadR0() {
+  micsPrefs.begin("mics", false);
+  micsR0_CO  = micsPrefs.getFloat("r0_co", 0.0f);
+  micsR0_NO2 = micsPrefs.getFloat("r0_no2", 0.0f);
+  micsR0_NH3 = micsPrefs.getFloat("r0_nh3", 0.0f);
+  micsCalibratedCO  = micsR0_CO > 0.0f;
+  micsCalibratedNO2 = micsR0_NO2 > 0.0f;
+  micsCalibratedNH3 = micsR0_NH3 > 0.0f;
+}
+
+static void micsPrintR0(const char *label) {
+  Serial.print(label);
+  if (micsCalibratedCO) Serial.printf(" CO=%.0f", micsR0_CO);
+  else Serial.print(" CO=invalid");
+  if (micsCalibratedNO2) Serial.printf(" NO2=%.0f", micsR0_NO2);
+  else Serial.print(" NO2=invalid");
+  if (micsCalibratedNH3) Serial.printf(" NH3=%.0f", micsR0_NH3);
+  else Serial.print(" NH3=invalid");
+  Serial.println(" ohm");
+}
+
+// Average Rs over MICS_CAL_SAMPLES (1/sec) in clean air and save it as R0.
+// Channels sitting on an ADC rail are skipped and marked invalid.
+static void micsCalibrate() {
+  Serial.printf("MiCS-6814 R0 calibration (%d readings, 1/sec) - keep the sensor in clean air:\n",
+                MICS_CAL_SAMPLES);
+  double sumRs_CO = 0, sumRs_NO2 = 0, sumRs_NH3 = 0;
+  int calSamplesCO = 0, calSamplesNO2 = 0, calSamplesNH3 = 0;
+
+  for (int i = 1; i <= MICS_CAL_SAMPLES; i++) {
+    const int nh3 = analogReadAvg(MICS_NH3_PIN);
+    const int co  = analogReadAvg(MICS_CO_PIN);
+    const int no2 = analogReadAvg(MICS_NO2_PIN);
+    const int nh3Mv = micsReadMilliVolts(MICS_NH3_PIN);
+    const int coMv  = micsReadMilliVolts(MICS_CO_PIN);
+    const int no2Mv = micsReadMilliVolts(MICS_NO2_PIN);
+
+    Serial.printf("  [%2d] NH3=%4dmV (%s)  CO=%4dmV (%s)  NO2=%4dmV (%s)\n",
+                  i,
+                  nh3Mv, micsRawStatusLabel(nh3),
+                  coMv, micsRawStatusLabel(co),
+                  no2Mv, micsRawStatusLabel(no2));
+
+    if (micsRawUsable(co)) {
+      sumRs_CO += voltageToRs(coMv, MICS_RLOAD_CO_OHM);
+      calSamplesCO++;
+    }
+    if (micsRawUsable(no2)) {
+      sumRs_NO2 += voltageToRs(no2Mv, MICS_RLOAD_NO2_OHM);
+      calSamplesNO2++;
+    }
+    if (micsRawUsable(nh3)) {
+      sumRs_NH3 += voltageToRs(nh3Mv, MICS_RLOAD_NH3_OHM);
+      calSamplesNH3++;
+    }
+
+    if (i < MICS_CAL_SAMPLES) serviceDelay(1000);
+  }
+
+  micsCalibratedCO  = calSamplesCO > 0;
+  micsCalibratedNO2 = calSamplesNO2 > 0;
+  micsCalibratedNH3 = calSamplesNH3 > 0;
+  if (micsCalibratedCO)  micsR0_CO  = sumRs_CO  / calSamplesCO;
+  if (micsCalibratedNO2) micsR0_NO2 = sumRs_NO2 / calSamplesNO2;
+  if (micsCalibratedNH3) micsR0_NH3 = sumRs_NH3 / calSamplesNH3;
+  micsSaveR0();
+
+  if (micsCalibratedCO || micsCalibratedNO2 || micsCalibratedNH3) {
+    micsPrintR0("R0 calibrated and saved:");
+  } else {
+    Serial.println("R0 calibration FAILED — no valid MiCS samples. Check wiring/load resistors.");
+  }
+}
+
+// Runs from loop(): finishes warm-up without blocking the other sensors,
+// calibrates on first run (no saved R0) and on a BOOT button press.
+static void micsService() {
+  if (!micsWarmedUp) {
+    if (millis() < MICS_WARMUP_MS) return;
+    micsWarmedUp = true;
+    Serial.println("MiCS-6814 warm-up complete");
+    if (!micsCalibratedCO || !micsCalibratedNO2 || !micsCalibratedNH3) micsCalibrate();
+  }
+  if (digitalRead(MICS_RECAL_BUTTON_PIN) == LOW) micsCalibrate();
 }
 
 static void configureBme680() {
@@ -981,73 +1072,15 @@ void setup() {
   else Serial.println(" failed (server will timestamp if ts omitted)");
 #endif
 
-  // ---------- MiCS-6814 warm-up + R0 calibration ----------
-  if (MICS_WARMUP_MS > 0) {
-    Serial.printf("MiCS-6814 warm-up: %lu s before baseline capture\n", MICS_WARMUP_MS / 1000UL);
-    serviceDelay(MICS_WARMUP_MS);
-  }
-
-  // Take 20 readings (1/sec). Average Rs from the last 10 as R0 (assumes clean air).
-  Serial.println("MiCS-6814 warm-up + R0 calibration (20 readings, 1/sec):");
-  float sumRs_CO = 0, sumRs_NO2 = 0, sumRs_NH3 = 0;
-  int calSamplesCO = 0, calSamplesNO2 = 0, calSamplesNH3 = 0;
-
-  for (int i = 1; i <= 20; i++) {
-    int nh3 = analogReadAvg(MICS_NH3_PIN);
-    int co  = analogReadAvg(MICS_CO_PIN);
-    int no2 = analogReadAvg(MICS_NO2_PIN);
-    float vNh3Adc = adcToVolts(nh3);
-    float vCoAdc  = adcToVolts(co);
-    float vNo2Adc = adcToVolts(no2);
-    float vNh3 = micsSensorSideVoltage(vNh3Adc);
-    float vCo  = micsSensorSideVoltage(vCoAdc);
-    float vNo2 = micsSensorSideVoltage(vNo2Adc);
-
-    Serial.printf("  [%2d] NH3=%4d adc=%.3fV est_in=%.3fV (%s)  CO=%4d adc=%.3fV est_in=%.3fV (%s)  NO2=%4d adc=%.3fV est_in=%.3fV (%s)\n",
-                  i,
-                  nh3, vNh3Adc, vNh3, micsRawStatusLabel(nh3),
-                  co, vCoAdc, vCo, micsRawStatusLabel(co),
-                  no2, vNo2Adc, vNo2, micsRawStatusLabel(no2));
-
-    // Use last 10 readings for calibration
-    if (i >= 11) {
-      if (micsRawUsable(co)) {
-        sumRs_CO += voltageToRs(vCo, MICS_RLOAD_CO_OHM);
-        calSamplesCO++;
-      }
-      if (micsRawUsable(no2)) {
-        sumRs_NO2 += voltageToRs(vNo2, MICS_RLOAD_NO2_OHM);
-        calSamplesNO2++;
-      }
-      if (micsRawUsable(nh3)) {
-        sumRs_NH3 += voltageToRs(vNh3, MICS_RLOAD_NH3_OHM);
-        calSamplesNH3++;
-      }
-    }
-
-    if (i < 20) serviceDelay(1000);
-  }
-
-  micsCalibratedCO = calSamplesCO > 0;
-  micsCalibratedNO2 = calSamplesNO2 > 0;
-  micsCalibratedNH3 = calSamplesNH3 > 0;
-
-  if (micsCalibratedCO)  micsR0_CO  = sumRs_CO  / calSamplesCO;
-  if (micsCalibratedNO2) micsR0_NO2 = sumRs_NO2 / calSamplesNO2;
-  if (micsCalibratedNH3) micsR0_NH3 = sumRs_NH3 / calSamplesNH3;
-
-  if (micsCalibratedCO || micsCalibratedNO2 || micsCalibratedNH3) {
-    Serial.print("R0 calibrated:");
-    if (micsCalibratedCO) Serial.printf(" CO=%.1f", micsR0_CO);
-    else Serial.print(" CO=invalid");
-    if (micsCalibratedNO2) Serial.printf(" NO2=%.1f", micsR0_NO2);
-    else Serial.print(" NO2=invalid");
-    if (micsCalibratedNH3) Serial.printf(" NH3=%.1f", micsR0_NH3);
-    else Serial.print(" NH3=invalid");
-    Serial.println();
-  } else {
-    Serial.println("R0 calibration FAILED — no valid MiCS samples. Check wiring/load resistors.");
-  }
+  // ---------- MiCS-6814 R0 (warm-up + calibration continue in loop) ----------
+  pinMode(MICS_RECAL_BUTTON_PIN, INPUT_PULLUP);
+  micsLoadR0();
+  micsPrintR0("MiCS-6814 saved R0:");
+  Serial.printf("MiCS-6814 warm-up: %lu s (ppm omitted until done; %s)\n",
+                MICS_WARMUP_MS / 1000UL,
+                (micsCalibratedCO && micsCalibratedNO2 && micsCalibratedNH3)
+                    ? "using saved R0, press BOOT in clean air to recalibrate"
+                    : "R0 will be calibrated afterwards");
 }
 
 // ================= LOOP =================
@@ -1059,6 +1092,8 @@ void loop() {
 #if BATTERY_MONITOR_ENABLED
   updateChargerRelay(readBatteryVoltage(false));
 #endif
+
+  micsService();
 
   // Non-blocking send interval (replaces delay())
   static uint32_t lastSendMs = 0;
@@ -1102,20 +1137,21 @@ void loop() {
   const int micsNh3Raw = analogReadAvg(MICS_NH3_PIN);
   const int micsCoRaw  = analogReadAvg(MICS_CO_PIN);
   const int micsNo2Raw = analogReadAvg(MICS_NO2_PIN);
-  const float micsNh3V = adcToVolts(micsNh3Raw);
-  const float micsCoV  = adcToVolts(micsCoRaw);
-  const float micsNo2V = adcToVolts(micsNo2Raw);
-  const float micsNh3Vin = micsNh3V * MICS_DIVIDER_GAIN;
-  const float micsCoVin  = micsCoV  * MICS_DIVIDER_GAIN;
-  const float micsNo2Vin = micsNo2V * MICS_DIVIDER_GAIN;
-  const bool micsNh3RawOk = micsRawUsable(micsNh3Raw);
-  const bool micsCoRawOk  = micsRawUsable(micsCoRaw);
-  const bool micsNo2RawOk = micsRawUsable(micsNo2Raw);
+  const int micsNh3Mv = micsReadMilliVolts(MICS_NH3_PIN);
+  const int micsCoMv  = micsReadMilliVolts(MICS_CO_PIN);
+  const int micsNo2Mv = micsReadMilliVolts(MICS_NO2_PIN);
+  const float micsNh3V = micsNh3Mv / 1000.0f;
+  const float micsCoV  = micsCoMv  / 1000.0f;
+  const float micsNo2V = micsNo2Mv / 1000.0f;
+  // Raw must be off the ADC rails and the heater warmed up before ppm is trusted
+  const bool micsNh3RawOk = micsWarmedUp && micsRawUsable(micsNh3Raw);
+  const bool micsCoRawOk  = micsWarmedUp && micsRawUsable(micsCoRaw);
+  const bool micsNo2RawOk = micsWarmedUp && micsRawUsable(micsNo2Raw);
 
   // ---- Compute estimated concentrations ----
-  const float estCoPpm   = micsCO_ppm(micsCoVin);
-  const float estNo2Ppb  = micsNO2_ppb(micsNo2Vin);
-  const float estNh3Ppm  = micsNH3_ppm(micsNh3Vin);
+  const float estCoPpm   = micsCO_ppm(micsCoMv);
+  const float estNo2Ppb  = micsNO2_ppb(micsNo2Mv);
+  const float estNh3Ppm  = micsNH3_ppm(micsNh3Mv);
   const uint32_t uptimeSec = millis() / 1000UL;
 
   // ---- Build JSON ----
@@ -1295,12 +1331,15 @@ void loop() {
                   (unsigned long)so2LinkBytesRx, (unsigned long)so2LinkBadFrames);
   }
 
-  if (MICS_DIVIDER_GAIN != 1.0f) {
-    Serial.printf("MiCS6814 NH3=%.3fV CO=%.3fV NO2=%.3fV (at ADC) | est_in: NH3=%.3fV CO=%.3fV NO2=%.3fV\n",
-                  micsNh3V, micsCoV, micsNo2V, micsNh3Vin, micsCoVin, micsNo2Vin);
-  } else {
-    Serial.printf("MiCS6814 NH3=%.3fV CO=%.3fV NO2=%.3fV (at ADC)\n", micsNh3V, micsCoV, micsNo2V);
-  }
+  Serial.printf("MiCS6814 NH3=%.3fV CO=%.3fV NO2=%.3fV | Rs NH3=%.0f CO=%.0f NO2=%.0f | Rs/R0 NH3=%.2f CO=%.2f NO2=%.2f%s\n",
+                micsNh3V, micsCoV, micsNo2V,
+                voltageToRs(micsNh3Mv, MICS_RLOAD_NH3_OHM),
+                voltageToRs(micsCoMv, MICS_RLOAD_CO_OHM),
+                voltageToRs(micsNo2Mv, MICS_RLOAD_NO2_OHM),
+                micsCalibratedNH3 ? micsRatio(micsNh3Mv, MICS_RLOAD_NH3_OHM, micsR0_NH3) : 0.0f,
+                micsCalibratedCO ? micsRatio(micsCoMv, MICS_RLOAD_CO_OHM, micsR0_CO) : 0.0f,
+                micsCalibratedNO2 ? micsRatio(micsNo2Mv, MICS_RLOAD_NO2_OHM, micsR0_NO2) : 0.0f,
+                micsWarmedUp ? "" : " (warming up)");
 
 #if BATTERY_MONITOR_ENABLED
   Serial.printf("Battery  raw=%d pin=%.3fV batt=%.2fV instant=%.2fV charger=%s (on<=%.2fV off>=%.2fV)\n",

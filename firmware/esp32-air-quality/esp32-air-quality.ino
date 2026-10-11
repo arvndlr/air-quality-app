@@ -210,9 +210,18 @@ static float voltageToRs(float vOutMv, float rLoadOhms) {
 }
 
 // ---- ppm/ppb conversion from Rs/R0 ratio (power-law curves) ----
-// Approximate MiCS-6814 datasheet typical sensitivity curves.
-// Note: ratio=1.0 (clean air at calibration) maps to the curves' own baseline
-// (~4.4 ppm CO, ~146 ppb NO2, ~0.68 ppm NH3), not to zero.
+// The exponents (curve slopes) come from the MiCS-6814 datasheet typical curves.
+// The level at ratio=1.0 does NOT: the datasheet curves put clean air at
+// ~4.4 ppm CO / ~146 ppb NO2 / ~0.68 ppm NH3, which made every node read
+// "Unhealthy" NO2 in clean air. Instead, ratio=1.0 means "the air at the moment
+// R0 was captured", so set these to what a reference instrument (DENR-EMB
+// station, calibrated meter) read during that calibration window.
+// The defaults are typical clean outdoor background levels, NOT measured
+// values: replace them with your reference readings.
+static const float MICS_REF_CO_PPM  = 0.30f;
+static const float MICS_REF_NO2_PPB = 10.0f;
+static const float MICS_REF_NH3_PPM = 0.010f;
+
 static float micsRatio(float vOutMv, float rLoadOhms, float r0) {
   return voltageToRs(vOutMv, rLoadOhms) / r0;
 }
@@ -220,19 +229,19 @@ static float micsRatio(float vOutMv, float rLoadOhms, float r0) {
 static float micsCO_ppm(float vOutMv) {
   if (!micsCalibratedCO) return -1.0f;
   const float ratio = micsRatio(vOutMv, MICS_RLOAD_CO_OHM, micsR0_CO);
-  return fminf(4.385f * powf(ratio, -1.179f), 100.0f);
+  return fminf(MICS_REF_CO_PPM * powf(ratio, -1.179f), 100.0f);
 }
 
 static float micsNO2_ppb(float vOutMv) {
   if (!micsCalibratedNO2) return -1.0f;
   const float ratio = micsRatio(vOutMv, MICS_RLOAD_NO2_OHM, micsR0_NO2);
-  return fminf(powf(ratio, 1.007f) / 6.855f * 1000.0f, 2500.0f);
+  return fminf(MICS_REF_NO2_PPB * powf(ratio, 1.007f), 2500.0f);
 }
 
 static float micsNH3_ppm(float vOutMv) {
   if (!micsCalibratedNH3) return -1.0f;
   const float ratio = micsRatio(vOutMv, MICS_RLOAD_NH3_OHM, micsR0_NH3);
-  return fminf(powf(ratio, -1.67f) / 1.47f, 500.0f);
+  return fminf(MICS_REF_NH3_PPM * powf(ratio, -1.67f), 500.0f);
 }
 
 // ================= ULPSM-SO2 state (mirrored from the SO2 node) =================

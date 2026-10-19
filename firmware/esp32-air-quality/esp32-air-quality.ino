@@ -150,8 +150,20 @@ static const size_t SO2_LINK_RX_BUFFER = 1024;
 
 // Heater warm-up after power-on before readings/calibration are trusted.
 // Other sensors keep reporting during this time; MiCS ppm fields are omitted.
-static const uint32_t MICS_WARMUP_MS = 3UL * 60UL * 1000UL;
-static const int MICS_CAL_SAMPLES = 30; // 1 sample/second
+static const uint32_t MICS_WARMUP_MS = 20UL * 60UL * 1000UL;
+static const int MICS_CAL_SAMPLES = 300; // 1 sample/second = 5 minutes, non-blocking
+// A channel's new R0 is accepted only if at least this share of its
+// calibration samples were on-scale (not on an ADC rail).
+static const float MICS_CAL_MIN_VALID_FRACTION = 0.8f;
+// Plausible clean-air R0 per channel: MiCS-6814 datasheet ranges
+// (CO 100k-1.5M, NO2 0.8k-20k, NH3 10k-1.5M) widened ~50%. A cold heater or a
+// broken signal/GND wire gives values far outside these (e.g. NO2 ~134k cold).
+static const float MICS_R0_MIN_CO_OHM  = 50000.0f;
+static const float MICS_R0_MAX_CO_OHM  = 2000000.0f;
+static const float MICS_R0_MIN_NO2_OHM = 500.0f;
+static const float MICS_R0_MAX_NO2_OHM = 30000.0f;
+static const float MICS_R0_MIN_NH3_OHM = 5000.0f;
+static const float MICS_R0_MAX_NH3_OHM = 2000000.0f;
 
 // Load resistors to 3.3V (ohms) and the supply they connect to (mV).
 // For best accuracy, measure the 3V3 pin with a multimeter and put the value here.
@@ -801,6 +813,10 @@ static int micsReadMilliVolts(int pin) {
   return analogReadMilliVoltsAvgWithSamples(pin, ADC_SAMPLES);
 }
 
+static bool micsR0Plausible(float r0, float minOhm, float maxOhm) {
+  return r0 >= minOhm && r0 <= maxOhm;
+}
+
 static void micsSaveR0() {
   micsPrefs.putFloat("r0_co", micsCalibratedCO ? micsR0_CO : 0.0f);
   micsPrefs.putFloat("r0_no2", micsCalibratedNO2 ? micsR0_NO2 : 0.0f);
@@ -812,9 +828,15 @@ static void micsLoadR0() {
   micsR0_CO  = micsPrefs.getFloat("r0_co", 0.0f);
   micsR0_NO2 = micsPrefs.getFloat("r0_no2", 0.0f);
   micsR0_NH3 = micsPrefs.getFloat("r0_nh3", 0.0f);
-  micsCalibratedCO  = micsR0_CO > 0.0f;
-  micsCalibratedNO2 = micsR0_NO2 > 0.0f;
-  micsCalibratedNH3 = micsR0_NH3 > 0.0f;
+  micsCalibratedCO  = micsR0Plausible(micsR0_CO, MICS_R0_MIN_CO_OHM, MICS_R0_MAX_CO_OHM);
+  micsCalibratedNO2 = micsR0Plausible(micsR0_NO2, MICS_R0_MIN_NO2_OHM, MICS_R0_MAX_NO2_OHM);
+  micsCalibratedNH3 = micsR0Plausible(micsR0_NH3, MICS_R0_MIN_NH3_OHM, MICS_R0_MAX_NH3_OHM);
+  if ((micsR0_CO > 0.0f && !micsCalibratedCO) ||
+      (micsR0_NO2 > 0.0f && !micsCalibratedNO2) ||
+      (micsR0_NH3 > 0.0f && !micsCalibratedNH3)) {
+    Serial.printf("MiCS-6814 discarding implausible saved R0 (CO=%.0f NO2=%.0f NH3=%.0f ohm) - will recalibrate after warm-up\n",
+                  micsR0_CO, micsR0_NO2, micsR0_NH3);
+  }
 }
 
 static void micsPrintR0(const char *label) {
@@ -828,69 +850,116 @@ static void micsPrintR0(const char *label) {
   Serial.println(" ohm");
 }
 
-// Average Rs over MICS_CAL_SAMPLES (1/sec) in clean air and save it as R0.
-// Channels sitting on an ADC rail are skipped and marked invalid.
-static void micsCalibrate() {
-  Serial.printf("MiCS-6814 R0 calibration (%d readings, 1/sec) - keep the sensor in clean air:\n",
-                MICS_CAL_SAMPLES);
-  double sumRs_CO = 0, sumRs_NO2 = 0, sumRs_NH3 = 0;
-  int calSamplesCO = 0, calSamplesNO2 = 0, calSamplesNH3 = 0;
+// ---- Non-blocking R0 calibration ----
+// Averages Rs over MICS_CAL_SAMPLES (1/sec) in clean air while the other
+// sensors keep uploading. Only the requested channels are recalibrated, and a
+// channel keeps its previous R0 unless the new one is on-scale and plausible,
+// so one broken channel can no longer wipe out the others.
+static bool     micsCalActive = false;
+static bool     micsCalWantCO = false, micsCalWantNO2 = false, micsCalWantNH3 = false;
+static int      micsCalTaken = 0;
+static uint32_t micsCalLastSampleMs = 0;
+static double   micsCalSumCO = 0, micsCalSumNO2 = 0, micsCalSumNH3 = 0;
+static int      micsCalCountCO = 0, micsCalCountNO2 = 0, micsCalCountNH3 = 0;
 
-  for (int i = 1; i <= MICS_CAL_SAMPLES; i++) {
-    const int nh3 = analogReadAvg(MICS_NH3_PIN);
-    const int co  = analogReadAvg(MICS_CO_PIN);
-    const int no2 = analogReadAvg(MICS_NO2_PIN);
-    const int nh3Mv = micsReadMilliVolts(MICS_NH3_PIN);
-    const int coMv  = micsReadMilliVolts(MICS_CO_PIN);
-    const int no2Mv = micsReadMilliVolts(MICS_NO2_PIN);
+static void micsStartCalibration(bool co, bool no2, bool nh3) {
+  if (micsCalActive || !(co || no2 || nh3)) return;
+  micsCalActive = true;
+  micsCalWantCO = co;
+  micsCalWantNO2 = no2;
+  micsCalWantNH3 = nh3;
+  micsCalTaken = 0;
+  micsCalSumCO = micsCalSumNO2 = micsCalSumNH3 = 0;
+  micsCalCountCO = micsCalCountNO2 = micsCalCountNH3 = 0;
+  micsCalLastSampleMs = millis() - 1000UL;
+  Serial.printf("MiCS-6814 R0 calibration started for%s%s%s (%d readings, 1/sec) - keep the sensor in clean air\n",
+                co ? " CO" : "", no2 ? " NO2" : "", nh3 ? " NH3" : "", MICS_CAL_SAMPLES);
+}
 
-    Serial.printf("  [%2d] NH3=%4dmV (%s)  CO=%4dmV (%s)  NO2=%4dmV (%s)\n",
-                  i,
-                  nh3Mv, micsRawStatusLabel(nh3),
-                  coMv, micsRawStatusLabel(co),
-                  no2Mv, micsRawStatusLabel(no2));
+// Returns true when the channel's R0 was updated.
+static bool micsFinishChannel(const char *name, bool wanted, double sumRs, int count,
+                              float minOhm, float maxOhm, float &r0, bool &calibrated) {
+  if (!wanted) return false;
+  const int needed = (int)(MICS_CAL_SAMPLES * MICS_CAL_MIN_VALID_FRACTION);
+  if (count < needed) {
+    Serial.printf("  %s: only %d/%d on-scale samples - keeping previous R0 (%s). Check wiring / heater 5V.\n",
+                  name, count, MICS_CAL_SAMPLES, calibrated ? "valid" : "none");
+    return false;
+  }
+  const float avg = (float)(sumRs / count);
+  if (!micsR0Plausible(avg, minOhm, maxOhm)) {
+    Serial.printf("  %s: R0=%.0f ohm is outside %.0f-%.0f (heater cold or wiring fault) - keeping previous R0 (%s)\n",
+                  name, avg, minOhm, maxOhm, calibrated ? "valid" : "none");
+    return false;
+  }
+  r0 = avg;
+  calibrated = true;
+  return true;
+}
 
-    if (micsRawUsable(co)) {
-      sumRs_CO += voltageToRs(coMv, MICS_RLOAD_CO_OHM);
-      calSamplesCO++;
+static void micsCalibrationStep() {
+  if (!micsCalActive) return;
+  if (millis() - micsCalLastSampleMs < 1000UL) return;
+  micsCalLastSampleMs = millis();
+
+  if (micsCalWantCO) {
+    const int raw = analogReadAvg(MICS_CO_PIN);
+    if (micsRawUsable(raw)) {
+      micsCalSumCO += voltageToRs(micsReadMilliVolts(MICS_CO_PIN), MICS_RLOAD_CO_OHM);
+      micsCalCountCO++;
     }
-    if (micsRawUsable(no2)) {
-      sumRs_NO2 += voltageToRs(no2Mv, MICS_RLOAD_NO2_OHM);
-      calSamplesNO2++;
+  }
+  if (micsCalWantNO2) {
+    const int raw = analogReadAvg(MICS_NO2_PIN);
+    if (micsRawUsable(raw)) {
+      micsCalSumNO2 += voltageToRs(micsReadMilliVolts(MICS_NO2_PIN), MICS_RLOAD_NO2_OHM);
+      micsCalCountNO2++;
     }
-    if (micsRawUsable(nh3)) {
-      sumRs_NH3 += voltageToRs(nh3Mv, MICS_RLOAD_NH3_OHM);
-      calSamplesNH3++;
+  }
+  if (micsCalWantNH3) {
+    const int raw = analogReadAvg(MICS_NH3_PIN);
+    if (micsRawUsable(raw)) {
+      micsCalSumNH3 += voltageToRs(micsReadMilliVolts(MICS_NH3_PIN), MICS_RLOAD_NH3_OHM);
+      micsCalCountNH3++;
     }
-
-    if (i < MICS_CAL_SAMPLES) serviceDelay(1000);
   }
 
-  micsCalibratedCO  = calSamplesCO > 0;
-  micsCalibratedNO2 = calSamplesNO2 > 0;
-  micsCalibratedNH3 = calSamplesNH3 > 0;
-  if (micsCalibratedCO)  micsR0_CO  = sumRs_CO  / calSamplesCO;
-  if (micsCalibratedNO2) micsR0_NO2 = sumRs_NO2 / calSamplesNO2;
-  if (micsCalibratedNH3) micsR0_NH3 = sumRs_NH3 / calSamplesNH3;
-  micsSaveR0();
+  micsCalTaken++;
+  if (micsCalTaken % 60 == 0 && micsCalTaken < MICS_CAL_SAMPLES) {
+    Serial.printf("MiCS-6814 R0 calibration %d/%d\n", micsCalTaken, MICS_CAL_SAMPLES);
+  }
+  if (micsCalTaken < MICS_CAL_SAMPLES) return;
 
-  if (micsCalibratedCO || micsCalibratedNO2 || micsCalibratedNH3) {
+  micsCalActive = false;
+  Serial.println("MiCS-6814 R0 calibration finished:");
+  const bool co  = micsFinishChannel("CO", micsCalWantCO, micsCalSumCO, micsCalCountCO,
+                                     MICS_R0_MIN_CO_OHM, MICS_R0_MAX_CO_OHM, micsR0_CO, micsCalibratedCO);
+  const bool no2 = micsFinishChannel("NO2", micsCalWantNO2, micsCalSumNO2, micsCalCountNO2,
+                                     MICS_R0_MIN_NO2_OHM, MICS_R0_MAX_NO2_OHM, micsR0_NO2, micsCalibratedNO2);
+  const bool nh3 = micsFinishChannel("NH3", micsCalWantNH3, micsCalSumNH3, micsCalCountNH3,
+                                     MICS_R0_MIN_NH3_OHM, MICS_R0_MAX_NH3_OHM, micsR0_NH3, micsCalibratedNH3);
+  if (co || no2 || nh3) {
+    micsSaveR0();
     micsPrintR0("R0 calibrated and saved:");
   } else {
-    Serial.println("R0 calibration FAILED — no valid MiCS samples. Check wiring/load resistors.");
+    micsPrintR0("R0 unchanged:");
   }
 }
 
 // Runs from loop(): finishes warm-up without blocking the other sensors,
-// calibrates on first run (no saved R0) and on a BOOT button press.
+// calibrates channels that have no valid R0, and recalibrates all channels
+// on a BOOT button press (only after warm-up).
 static void micsService() {
   if (!micsWarmedUp) {
     if (millis() < MICS_WARMUP_MS) return;
     micsWarmedUp = true;
     Serial.println("MiCS-6814 warm-up complete");
-    if (!micsCalibratedCO || !micsCalibratedNO2 || !micsCalibratedNH3) micsCalibrate();
+    micsStartCalibration(!micsCalibratedCO, !micsCalibratedNO2, !micsCalibratedNH3);
   }
-  if (digitalRead(MICS_RECAL_BUTTON_PIN) == LOW) micsCalibrate();
+  if (!micsCalActive && digitalRead(MICS_RECAL_BUTTON_PIN) == LOW) {
+    micsStartCalibration(true, true, true);
+  }
+  micsCalibrationStep();
 }
 
 static void configureBme680() {

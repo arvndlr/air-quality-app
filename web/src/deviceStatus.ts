@@ -49,6 +49,12 @@ export function getSo2StatusSummary(measurement: Measurement | null | undefined)
     return { label: "Calibrating", detail: progress };
   }
 
+  // The SO2 node is calibrated but rejected this reading (pin at an ADC rail,
+  // too noisy, or below its baseline), so no ppb was sent and SO2 is not in the AQI.
+  if (measurement.so2Status === "unstable") {
+    return { label: "Unstable", detail: "check SO2 wiring" };
+  }
+
   if (measurement.so2Ppb != null || measurement.so2Status === "ok") {
     return {
       label: "Ready",

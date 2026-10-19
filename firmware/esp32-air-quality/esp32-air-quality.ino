@@ -266,7 +266,7 @@ static bool   so2LinkLineTooLong = false;
 
 static bool     so2LinkSeen = false;        // at least one valid frame since boot
 static uint32_t so2LinkLastFrameMs = 0;
-static char     so2LinkStatus[16] = "";     // ok | warming | calibrating
+static char     so2LinkStatus[16] = "";     // ok | warming | calibrating | unstable
 static float    so2Vgas = NAN;
 static float    so2Vref = NAN;
 static float    so2DeltaMv = NAN;
@@ -352,7 +352,8 @@ static bool so2LinkChecksumOk(const char *body, const char *csHex) {
 static bool so2LinkStatusValid(const char *status) {
   return strcmp(status, "ok") == 0 ||
          strcmp(status, "warming") == 0 ||
-         strcmp(status, "calibrating") == 0;
+         strcmp(status, "calibrating") == 0 ||
+         strcmp(status, "unstable") == 0;
 }
 
 // Parses one newline-terminated line in place.
@@ -1245,7 +1246,7 @@ void loop() {
     systemObj["bootCount"] = bootCount;
     systemObj["resetReason"] = resetReasonLabel(bootResetReason);
     // Mirror the SO2 node's own status. When the link is down the field is
-    // omitted entirely: the API enum only accepts warming/calibrating/ok, so
+    // omitted entirely: the API enum only accepts warming/calibrating/ok/unstable, so
     // sending "offline" would fail validation and drop the whole reading.
     if (so2Online) {
       systemObj["so2Status"] = so2LinkStatus;
@@ -1396,6 +1397,9 @@ void loop() {
   } else if (so2Ok) {
     Serial.printf("SO2     status=ok Vgas=%.4fV Vref=%.4fV delta=%+.3fmV est=%.1f ppb (node uptime %lus)\n",
                   so2Vgas, so2Vref, so2DeltaMv, so2Ppb, (unsigned long)so2NodeUptimeSec);
+  } else if (strcmp(so2LinkStatus, "unstable") == 0) {
+    Serial.printf("SO2     status=unstable Vgas=%.4fV Vref=%.4fV (node flagged this reading; no ppb sent)\n",
+                  so2Vgas, so2Vref);
   } else if (strcmp(so2LinkStatus, "warming") == 0) {
     Serial.printf("SO2     status=warming Vgas=%.4fV Vref=%.4fV (%lu min left on node)\n",
                   so2Vgas, so2Vref, (unsigned long)((so2WarmupLeftSec + 59UL) / 60UL));

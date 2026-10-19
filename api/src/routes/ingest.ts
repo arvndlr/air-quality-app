@@ -40,7 +40,7 @@ export function ingestRouter(hub: WsHub) {
         uptimeSec: z.number().int().nonnegative().optional(),
         bootCount: z.number().int().nonnegative().optional(),
         resetReason: z.string().min(1).optional(),
-        so2Status: z.enum(["warming", "calibrating", "ok"]).optional(),
+        so2Status: z.enum(["warming", "calibrating", "ok", "unstable"]).optional(),
         so2WarmupRemainingSec: z.number().int().nonnegative().optional(),
         so2BaselineProgress: z.number().int().nonnegative().optional(),
         so2BaselineTarget: z.number().int().positive().optional()

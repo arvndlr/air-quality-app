@@ -56,9 +56,12 @@ export function getSo2StatusSummary(measurement: Measurement | null | undefined)
   }
 
   if (measurement.so2Ppb != null || measurement.so2Status === "ok") {
+    const ppm =
+      measurement.so2Ppb != null ? measurement.so2Ppb / 1000 : null;
+  
     return {
       label: "Ready",
-      detail: measurement.so2Ppb != null ? `${measurement.so2Ppb.toFixed(1)} ppb` : null
+      detail: ppm != null ? `${ppm.toFixed(3)} PPM` : null
     };
   }
 

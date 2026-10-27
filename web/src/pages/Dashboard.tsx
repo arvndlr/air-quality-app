@@ -325,7 +325,7 @@ export function Dashboard() {
             <div className="mini-stat__label">SO\u2082</div>
            <div className="mini-stat__value">
             {latest?.so2Ppb != null
-              ? `${(latest.so2Ppb / 1000).toFixed(3)} PPM`
+              ? `${(latest.so2Ppb / 1000).toFixed(3)} ppm`
               : so2PendingText}
           </div>
             {so2Status.detail ? <div className="mini-stat__subvalue">{so2Status.detail}</div> : null}

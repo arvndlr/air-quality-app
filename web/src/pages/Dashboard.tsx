@@ -244,7 +244,7 @@ export function Dashboard() {
           />
           <PollutantCard
             title="SO<sub>2</sub>"
-            unit="PPM"
+            unit="ppm"
             value={latest?.so2Ppb != null ? latest.so2Ppb / 1000 : null}
             subIndex={aqiData?.so2SubIndex ?? null}
             loading={loading}

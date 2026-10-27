@@ -58,6 +58,7 @@ export function ingestRouter(hub: WsHub) {
         vgas: z.number().finite().optional(),
         vref: z.number().finite().optional(),
         mv: z.number().finite().optional(),
+        ppm: z.number().finite().optional(),
         ppb: z.number().finite().optional()
       })
       .optional(),
@@ -118,7 +119,11 @@ export function ingestRouter(hub: WsHub) {
         micsNh3V: payload.mics6814?.nh3V,
         micsCoV: payload.mics6814?.coV,
         micsNo2V: payload.mics6814?.no2V,
-        so2Ppb: payload.so2?.ppb,
+        so2Ppb:
+        payload.so2?.ppb ??
+        (payload.so2?.ppm != null
+          ? payload.so2.ppm * 1000
+          : undefined),
         micsCoPpm: payload.mics6814?.coPpm,
         micsNo2Ppb: payload.mics6814?.no2Ppb,
         micsNh3Ppm: payload.mics6814?.nh3Ppm

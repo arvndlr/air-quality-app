@@ -91,7 +91,7 @@ const pollutantDetails: Record<string, PollutantInfo> = {
       "Coarse dust lodges in the nose, throat, and upper airways, which is why irritation and coughing come first.",
   },
   "SO<sub>2</sub>": {
-    thresholds: "Good: 0-35 \u00b7 Moderate: 36-75 \u00b7 USG: 76-185 \u00b7 Unhealthy: 186-304 \u00b7 Very Unhealthy: 305-604 \u00b7 Hazardous: 605+ (ppb)",
+    thresholds: "Good: 0-35 \u00b7 Moderate: 36-75 \u00b7 USG: 76-185 \u00b7 Unhealthy: 186-304 \u00b7 Very Unhealthy: 305-604 \u00b7 Hazardous: 605+ (ppm)",
     healthNotes: "Short-term exposure can harm the respiratory system, particularly in people with asthma. Can cause difficulty breathing and chest tightness.",
     recommendation: "People with asthma should carry inhalers. Avoid outdoor exercise near industrial areas when levels are elevated.",
     sensitiveGroups:

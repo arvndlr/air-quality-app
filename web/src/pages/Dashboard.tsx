@@ -10,7 +10,6 @@ import { formatDurationCompact, formatResetReason, getSo2StatusSummary, isMeasur
 import { AqiCard } from "../components/AqiCard";
 import { PollutantCard } from "../components/PollutantCard";
 import { useDeviceWebSocket } from "../useWebSocket";
-
 type RangeKey = "day" | "week" | "month" | "year";
 
 const ranges: Array<{ key: RangeKey; label: string }> = [

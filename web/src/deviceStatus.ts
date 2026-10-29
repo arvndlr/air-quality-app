@@ -55,15 +55,16 @@ export function getSo2StatusSummary(measurement: Measurement | null | undefined)
     return { label: "Unstable", detail: "check SO2 wiring" };
   }
 
-  if (measurement.so2Ppb != null || measurement.so2Status === "ok") {
-    const ppm =
-      measurement.so2Ppb != null ? measurement.so2Ppb / 1000 : null;
-  
-    return {
-      label: "Ready",
-      detail: ppm != null ? `${ppm.toFixed(3)} PPM` : null
-    };
-  }
+
+if (measurement.so2Ppb != null || measurement.so2Status === "ok") {
+  const ppb = measurement.so2Ppb;
+
+  return {
+    label: "Ready",
+    detail: ppb != null ? `${ppb.toFixed(1)} ppb` : null
+  };
+}
+
 
   return { label: "\u2014", detail: null as string | null };
 }

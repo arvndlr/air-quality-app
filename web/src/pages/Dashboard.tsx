@@ -1,3 +1,5 @@
+dashboard.tsx
+
 import { useEffect, useMemo, useState } from "react";
 import { formatDistanceToNowStrict, formatISO, subDays, subMonths, subWeeks, subYears } from "date-fns";
 import { useSearchParams } from "react-router-dom";
@@ -22,7 +24,7 @@ const metrics = [
   { key: "co2ppm", label: "CO\u2082 (ppm)" },
   { key: "pm25ugm3", label: "PM\u2082.\u2085 (\u00b5g/m\u00b3)" },
   { key: "pm10ugm3", label: "PM\u2081\u2080 (\u00b5g/m\u00b3)" },
-  { key: "so2Ppb", label: "SO\u2082 (ppm)" },
+  { key: "so2Ppb", label: "SO\u2082 (ppb)" },
   { key: "micsCoPpm", label: "CO (ppm)" },
   { key: "micsNo2Ppb", label: "NO\u2082 (ppb)" },
   { key: "micsNh3Ppm", label: "NH\u2083 (ppm)" },
@@ -244,11 +246,11 @@ export function Dashboard() {
           />
           <PollutantCard
             title="SO<sub>2</sub>"
-            unit="ppm"
-            value={latest?.so2Ppb != null ? latest.so2Ppb / 1000 : null}
+            unit="ppb"
+            value={latest?.so2Ppb ?? null}
             subIndex={aqiData?.so2SubIndex ?? null}
             loading={loading}
-            format={(v) => v.toFixed(3)}
+            format={(v) => v.toFixed(1)}
             emptyText={so2PendingText}
           />
           <PollutantCard
@@ -323,11 +325,7 @@ export function Dashboard() {
           </div>
           <div className="mini-stat">
             <div className="mini-stat__label">SO\u2082</div>
-           <div className="mini-stat__value">
-            {latest?.so2Ppb != null
-              ? `${(latest.so2Ppb / 1000).toFixed(3)} ppm`
-              : so2PendingText}
-          </div>
+            <div className="mini-stat__value">{latest?.so2Ppb != null ? `${latest.so2Ppb.toFixed(1)} ppb` : so2PendingText}</div>
             {so2Status.detail ? <div className="mini-stat__subvalue">{so2Status.detail}</div> : null}
           </div>
           <div className="mini-stat">

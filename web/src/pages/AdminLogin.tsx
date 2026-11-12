@@ -43,6 +43,7 @@ export function AdminLogin() {
 
    //  signInAdmin(email);
     // navigate(redirectTarget, { replace: true });
+    setError("Backend authentication is not yet configured.");
   }
 
   return (

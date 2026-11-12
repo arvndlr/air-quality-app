@@ -41,8 +41,8 @@ export function AdminLogin() {
       return;
     }
 
-    signInAdmin(email);
-    navigate(redirectTarget, { replace: true });
+   //  signInAdmin(email);
+    // navigate(redirectTarget, { replace: true });
   }
 
   return (

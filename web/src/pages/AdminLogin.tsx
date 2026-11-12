@@ -41,9 +41,9 @@ export function AdminLogin() {
       return;
     }
 
-   //  signInAdmin(email);
-    // navigate(redirectTarget, { replace: true });
-    setError("Backend authentication is not yet configured.");
+    signInAdmin(email);
+    navigate(redirectTarget, { replace: true });
+    
   }
 
   return (

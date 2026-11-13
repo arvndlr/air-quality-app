@@ -297,58 +297,57 @@ export function Dashboard() {
         </div>
       </div>
 
+            
       <div className="dashboard-section">
         <h2 className="dashboard-section__title">Additional Readings</h2>
+      
         <div className="stats-grid">
           <div className="mini-stat">
             <div className="mini-stat__label">Temperature</div>
-            <div className="mini-stat__value">{latest?.tempC != null ? `${latest.tempC.toFixed(1)}\u00b0C` : "\u2014"}</div>
+            <div className="mini-stat__value">
+              {latest?.tempC != null
+                ? `${latest.tempC.toFixed(1)}°C`
+                : "—"}
+            </div>
           </div>
+      
           <div className="mini-stat">
             <div className="mini-stat__label">Humidity</div>
-            <div className="mini-stat__value">{latest?.rh != null ? `${latest.rh.toFixed(1)}%` : "\u2014"}</div>
+            <div className="mini-stat__value">
+              {latest?.rh != null
+                ? `${latest.rh.toFixed(1)}%`
+                : "—"}
+            </div>
           </div>
-          <div className="mini-stat">
-            <div className="mini-stat__label">VOC Index</div>
-            <div className="mini-stat__value">{latest?.vocIndex != null ? `${latest.vocIndex.toFixed(0)}` : "\u2014"}</div>
-          </div>
+      
           <div className="mini-stat">
             <div className="mini-stat__label">Gas Resistance</div>
-            <div className="mini-stat__value">{latest?.gasKohm != null ? `${latest.gasKohm.toFixed(1)} k\u03a9` : "\u2014"}</div>
+            <div className="mini-stat__value">
+              {latest?.gasKohm != null
+                ? `${latest.gasKohm.toFixed(1)} kΩ`
+                : "—"}
+            </div>
           </div>
+      
           <div className="mini-stat">
-            <div className="mini-stat__label">Battery</div>
-            <div className="mini-stat__value" style={{ color: batteryStatus.color }}>{batteryStatus.summary}</div>
-            <div className="mini-stat__subvalue">{batteryStatus.voltageText}</div>
+            <div className="mini-stat__label">SO₂ Status</div>
+            <div className="mini-stat__value">
+              {so2Status.label}
+            </div>
+            {so2Status.detail ? (
+              <div className="mini-stat__subvalue">
+                {so2Status.detail}
+              </div>
+            ) : null}
           </div>
+      
           <div className="mini-stat">
-            <div className="mini-stat__label">SO\u2082</div>
-            <div className="mini-stat__value">{latest?.so2Ppb != null ? `${latest.so2Ppb.toFixed(1)} ppb` : so2PendingText}</div>
-            {so2Status.detail ? <div className="mini-stat__subvalue">{so2Status.detail}</div> : null}
-          </div>
-          <div className="mini-stat">
-            <div className="mini-stat__label">SO\u2082 State</div>
-            <div className="mini-stat__value">{so2Status.label}</div>
-          </div>
-          <div className="mini-stat">
-            <div className="mini-stat__label">Uptime</div>
-            <div className="mini-stat__value">{deviceUptime}</div>
-          </div>
-          <div className="mini-stat">
-            <div className="mini-stat__label">Boot</div>
-            <div className="mini-stat__value">{latest?.bootCount != null ? `#${latest.bootCount}` : "\u2014"}</div>
-          </div>
-          <div className="mini-stat">
-            <div className="mini-stat__label">Reset</div>
-            <div className="mini-stat__value">{resetReasonText}</div>
-          </div>
-          <div className="mini-stat">
-            <div className="mini-stat__label">NO\u2082</div>
-            <div className="mini-stat__value">{latest?.micsNo2Ppb != null ? `${latest.micsNo2Ppb.toFixed(1)} ppb` : "\u2014"}</div>
-          </div>
-          <div className="mini-stat">
-            <div className="mini-stat__label">NH\u2083</div>
-            <div className="mini-stat__value">{latest?.micsNh3Ppm != null ? `${latest.micsNh3Ppm.toFixed(2)} ppm` : "\u2014"}</div>
+            <div className="mini-stat__label">Boot Count</div>
+            <div className="mini-stat__value">
+              {latest?.bootCount != null
+                ? `#${latest.bootCount}`
+                : "—"}
+            </div>
           </div>
         </div>
       </div>

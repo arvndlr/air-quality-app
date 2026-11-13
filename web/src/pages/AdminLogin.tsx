@@ -28,23 +28,31 @@ export function AdminLogin() {
     return <Navigate replace to={redirectTarget} />;
   }
 
+  
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    if (!email.trim()) {
-      setError("Enter the admin email before continuing.");
+    setError(null);
+  
+    const ADMIN_EMAIL = "admin@gmail.com";
+    const ADMIN_PASSWORD = "admin123";
+  
+    if (!email.trim() || !password) {
+      setError("Please enter your email and password.");
       return;
     }
-
-    if (password.trim().length < 8) {
-      setError("Enter the admin password with at least 8 characters.");
+  
+    if (
+      email.trim().toLowerCase() !== ADMIN_EMAIL ||
+      password !== ADMIN_PASSWORD
+    ) {
+      setError("Invalid email or password.");
       return;
     }
-
-    signInAdmin(email);
+  
+    signInAdmin(ADMIN_EMAIL);
     navigate(redirectTarget, { replace: true });
-    
   }
+
 
   return (
     <div className="auth-page">

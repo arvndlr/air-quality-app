@@ -10,6 +10,7 @@ import { seriesRouter } from "./routes/series.js";
 import { latestRouter } from "./routes/latest.js";
 import { devicesRouter } from "./routes/devices.js";
 import { transmissionsRouter } from "./routes/transmissions.js";
+import { analyticsRouter } from "./routes/analytics.js";
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));
@@ -23,7 +24,7 @@ app.use("/api/v1/ingest", ingestRouter(hub));
 app.use("/api/v1/series", seriesRouter);
 app.use("/api/v1/latest", latestRouter);
 app.use("/api/v1/transmissions", transmissionsRouter);
-
+app.use("/api/v1/analytics", analyticsRouter);
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   if (err instanceof ZodError) {
     return res.status(400).json({ error: "Invalid request", issues: err.issues });

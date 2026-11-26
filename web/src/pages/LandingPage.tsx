@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 const landingStats = [
   { value: "24/7", label: "Monitoring coverage", detail: "Continuous node reporting and dashboard visibility." },
   { value: "7", label: "Key air indicators", detail: "PM, gases, humidity, and temperature in one workflow." },
-  { value: "3", label: "Deployment zones", detail: "Public Market, Circle Uptown, and Palikpikan tracking." }
+  { value: "3", label: "Deployment zones", detail: "Unit 1, Unit 2, and Unit 3 tracking." }
 ];
 
 const landingFeatures = [
@@ -22,9 +22,9 @@ const landingFeatures = [
 ];
 
 const networkSites = [
-  { name: "Public Market", detail: "Dense pedestrian flow and transport activity." },
-  { name: "Circle Uptown", detail: "Roadside conditions and mixed commercial exposure." },
-  { name: "Palikpikan", detail: "Community baseline readings for neighborhood comparison." }
+  { name: "Unit 1", detail: "Dense pedestrian flow and transport activity." },
+  { name: "Unit 2", detail: "Roadside conditions and mixed commercial exposure." },
+  { name: "Unit 3", detail: "Community baseline readings for neighborhood comparison." }
 ];
 
 export function LandingPage() {

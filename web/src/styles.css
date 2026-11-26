@@ -4098,7 +4098,7 @@ select option {
 /* Overview cards */
 .an-cards {
   display: grid;
-  grid-template-columns: 1.4fr repeat(4, 1fr);
+  grid-template-columns: 1.4fr repeat(3, 1fr);
   gap: 12px;
 }
 
@@ -4125,11 +4125,6 @@ select option {
   font-weight: 700;
   line-height: 1.2;
   margin: 4px 0;
-}
-
-.an-card__value--text {
-  font-size: 1.8rem;
-  color: #b91c1c;
 }
 
 .an-card__value--accent {

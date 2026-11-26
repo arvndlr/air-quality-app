@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { getLatest, listDevices, type AqiResult, type Device, type Measurement } from "../api";
 import { getBatteryStatus } from "../battery";
 import { formatDurationCompact, formatResetReason, getSo2StatusSummary, isMeasurementOnline } from "../deviceStatus";
-import { displayDeviceName } from "../deviceNames";
+import { displayDeviceName, unitParam } from "../deviceNames";
 
 type NodeStatus = {
   device: Device;
@@ -98,7 +98,7 @@ export function SensorNodes() {
             <Link
               key={n.device.externalId}
               className="sensor-node-card sensor-node-card--interactive"
-              to={`/admin?deviceId=${encodeURIComponent(n.device.externalId)}`}
+              to={`/admin?unit=${encodeURIComponent(unitParam(n.device.externalId))}`}
             >
               <div className="sensor-node-card__header">
                 <div className="sensor-node-card__name">

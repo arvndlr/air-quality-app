@@ -9,7 +9,7 @@ import { formatDurationCompact, formatResetReason, getSo2StatusSummary, isMeasur
 import { AqiCard } from "../components/AqiCard";
 import { PollutantCard } from "../components/PollutantCard";
 import { useDeviceWebSocket } from "../useWebSocket";
-import { displayDeviceName } from "../deviceNames";
+import { deviceIdFromUnitParam, displayDeviceName, unitParam } from "../deviceNames";
 type RangeKey = "day" | "week" | "month" | "year";
 
 const ranges: Array<{ key: RangeKey; label: string }> = [
@@ -56,9 +56,11 @@ function computeWindow(range: RangeKey) {
 
 export function Dashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const requestedDeviceId = searchParams.get("deviceId");
+  // `?unit=1` selects Unit 1; old `?deviceId=` links still work and are rewritten.
+  const requestedDeviceId = deviceIdFromUnitParam(searchParams.get("unit")) ?? searchParams.get("deviceId");
   const [devices, setDevices] = useState<Device[]>([]);
-  const [deviceId, setDeviceId] = useState<string | null>(() => loadSavedDeviceId());
+  // Start from the station in the URL, so the URL sync below doesn't overwrite it with the saved one.
+  const [deviceId, setDeviceId] = useState<string | null>(() => requestedDeviceId ?? loadSavedDeviceId());
   const [range, setRange] = useState<RangeKey>("day");
   const [metric, setMetric] = useState<(typeof metrics)[number]["key"]>(metrics[0]!.key);
 
@@ -107,15 +109,16 @@ export function Dashboard() {
   }, [deviceId]);
 
   useEffect(() => {
-    const currentParam = searchParams.get("deviceId");
+    const desired = deviceId ? unitParam(deviceId) : null;
 
-    if (deviceId === currentParam) return;
+    if (searchParams.get("unit") === desired && !searchParams.has("deviceId")) return;
 
     const nextParams = new URLSearchParams(searchParams);
-    if (deviceId) {
-      nextParams.set("deviceId", deviceId);
+    nextParams.delete("deviceId");
+    if (desired) {
+      nextParams.set("unit", desired);
     } else {
-      nextParams.delete("deviceId");
+      nextParams.delete("unit");
     }
     setSearchParams(nextParams, { replace: true });
   }, [deviceId, searchParams, setSearchParams]);

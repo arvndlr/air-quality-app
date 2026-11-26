@@ -1,3 +1,4 @@
+import { displayDeviceName } from "./deviceNames";
 import { resolveApiBaseUrl } from "./runtimeUrls";
 
 export type Device = {
@@ -141,7 +142,7 @@ export async function listDevices(): Promise<Device[]> {
   const res = await fetch(`${API_URL}/api/v1/devices`);
   if (!res.ok) throw new Error("Failed to load devices");
   const json = (await res.json()) as { devices: Device[] };
-  return json.devices;
+  return json.devices.map((device) => ({ ...device, name: displayDeviceName(device.externalId, device.name) }));
 }
 
 export async function getLatest(deviceId: string): Promise<{ latest: Measurement | null; aqi: AqiResult | null }> {
@@ -218,7 +219,11 @@ export async function getTransmissionHistory(
 
   const res = await fetch(url);
   if (!res.ok) throw new Error("Failed to load transmission history");
-  return (await res.json()) as TransmissionHistoryResponse;
+  const json = (await res.json()) as TransmissionHistoryResponse;
+  return {
+    ...json,
+    rows: json.rows.map((row) => ({ ...row, deviceName: displayDeviceName(row.deviceExternalId, row.deviceName) }))
+  };
 }
 
 export type TransmissionExportMode = "detail" | "daily";
@@ -426,7 +431,17 @@ export async function getAnalyticsOverview(params: { deviceId: string; from: str
   url.searchParams.set("to", params.to);
   const res = await fetch(url);
   if (!res.ok) throw new Error("Failed to load analytics");
-  return (await res.json()) as AnalyticsOverview;
+  const json = (await res.json()) as AnalyticsOverview;
+  const { externalId, name } = json.device;
+  const display = displayDeviceName(externalId, name);
+  return {
+    ...json,
+    device: { externalId, name: display },
+    summary: {
+      ...json.summary,
+      advisoryText: json.summary.advisoryText.replace(`Station: ${name ?? externalId} (${externalId})`, `Station: ${display}`)
+    }
+  };
 }
 
 export type RetentionStatus = {

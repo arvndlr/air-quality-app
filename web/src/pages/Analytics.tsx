@@ -199,11 +199,6 @@ function OverviewCards({ data }: { data: AnalyticsOverview }) {
         <div className="an-card__meta">{current.official ? "Official (≥75% data capture)" : "Provisional / indicative"}</div>
       </div>
       <div className="an-card">
-        <div className="an-card__label">Main pollutant</div>
-        <div className="an-card__value an-card__value--text">{current.dominantLabel ?? "—"}</div>
-        <div className="an-card__meta">{fmt(current.dominantValue, current.dominantUnit ?? undefined)}</div>
-      </div>
-      <div className="an-card">
         <div className="an-card__label">Peak daily AQI (range)</div>
         <div className="an-card__value" style={{ color: summary.peakAqi != null ? categoryForIndex(summary.peakAqi).color : undefined }}>
           {summary.peakAqi ?? "—"}

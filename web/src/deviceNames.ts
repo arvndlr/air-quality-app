@@ -12,6 +12,18 @@ export function displayDeviceName(externalId: string, name?: string | null): str
   return BY_ID.get(externalId) ?? name ?? externalId;
 }
 
+/** URL value for a device ("1" for Unit 1), so links never contain the device ID. */
+export function unitParam(externalId: string): string {
+  const unit = BY_ID.get(externalId);
+  return unit ? unit.replace(/^Unit\s+/, "") : externalId;
+}
+
+/** Device ID for a `unit` URL value written by `unitParam`. */
+export function deviceIdFromUnitParam(param: string | null): string | null {
+  if (!param) return null;
+  return UNITS.find((u) => u.unit === `Unit ${param}`)?.externalId ?? param;
+}
+
 /** Replaces stored station names and device IDs in text from the API (for example CSV exports). */
 export function replaceDeviceNames(text: string): string {
   let result = text;

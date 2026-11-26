@@ -1,4 +1,4 @@
-import { categoryFor, subIndex, type AqiPollutant, type CategoryInfo } from "../aqi.js";
+import { categoryFor, subIndex, type AqiPollutant, type CategoryInfo } from "./denr.js";
 
 export type PollutantKey = "pm25" | "pm10" | "so2" | "co" | "no2" | "co2" | "voc" | "nh3";
 

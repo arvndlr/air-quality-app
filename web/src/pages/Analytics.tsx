@@ -288,9 +288,7 @@ function PollutantTable({ rows }: { rows: AnalyticsPollutantRow[] }) {
                   )}
                 </td>
                 <td className="an-table__index">
-                  {regulatory.index ?? "—"}
-                  {regulatory.index != null && !regulatory.valid && <span className="an-table__asterisk">*</span>}
-                </td>
+                  {regulatory.index ?? "—"}                </td>
                 <td>
                   {regulatory.index != null ? <CategoryBadge index={regulatory.index} small /> : <span className="an-muted">—</span>}
                 </td>
@@ -304,7 +302,7 @@ function PollutantTable({ rows }: { rows: AnalyticsPollutantRow[] }) {
       </table>
       <p className="an-note">
         Highlighted columns are the averaging period DENR uses for each pollutant's AQI (24-hour for PM2.5, PM10, SO2 and
-        NO2; 8-hour for CO). <strong>*</strong> or "provisional" means the window has less than the required 75% data
+        NO2; 8-hour for CO). "Provisional" means the window has less than the required 75% data
         capture. The overall AQI uses PM2.5, PM10 and SO2 only; CO and NO2 are estimated by an uncalibrated sensor, and
         CO2, VOC and NH3 are indicators.
       </p>

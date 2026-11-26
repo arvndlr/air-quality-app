@@ -4302,11 +4302,6 @@ select option {
   font-size: 1rem;
 }
 
-.an-table__asterisk {
-  color: var(--muted);
-  font-weight: 400;
-}
-
 .an-table--compact th,
 .an-table--compact td {
   text-align: left;

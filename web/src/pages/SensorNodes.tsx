@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { formatDistanceToNowStrict } from "date-fns";
 import { Link } from "react-router-dom";
 import { getLatest, listDevices, type AqiResult, type Device, type Measurement } from "../api";
-import { categoryByLabel } from "../aqiScale";
 import { getBatteryStatus } from "../battery";
 import { formatDurationCompact, formatResetReason, getSo2StatusSummary, isMeasurementOnline } from "../deviceStatus";
 
@@ -23,7 +22,22 @@ function StatusDot({ online }: { online: boolean }) {
 }
 
 function categoryColor(cat: string): string {
-  return categoryByLabel(cat)?.color ?? "var(--muted)";
+  switch (cat.toLowerCase()) {
+    case "good":
+      return "#4ade80";
+    case "moderate":
+      return "#facc15";
+    case "unhealthy for sensitive groups":
+      return "#fb923c";
+    case "unhealthy":
+      return "#ef4444";
+    case "very unhealthy":
+      return "#a855f7";
+    case "hazardous":
+      return "#7f1d1d";
+    default:
+      return "var(--muted)";
+  }
 }
 
 export function SensorNodes() {

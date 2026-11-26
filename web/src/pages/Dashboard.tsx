@@ -281,8 +281,7 @@ export function Dashboard() {
             title="NO<sub>2</sub>"
             unit="ppb"
             value={latest?.micsNo2Ppb ?? null}
-            subIndex={null}
-            indicatorKind="no2"
+            subIndex={aqiData?.no2SubIndex ?? null}
             loading={loading}
             format={(v) => v.toFixed(1)}
           />

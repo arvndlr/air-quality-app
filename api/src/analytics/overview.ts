@@ -1,6 +1,6 @@
 import { Prisma, type PollutionEvent } from "@prisma/client";
 import { prisma } from "../prisma.js";
-import { CATEGORIES, categoryFor, subIndexDetail, type CategoryInfo } from "../aqi.js";
+import { CATEGORIES, categoryFor, subIndexDetail, type CategoryInfo } from "./denr.js";
 import { dailyDetails, loadDailySummaries, type DailyDetails } from "./daily.js";
 import { categoryRank, menroTierActions, type EventEvidence } from "./events.js";
 import {

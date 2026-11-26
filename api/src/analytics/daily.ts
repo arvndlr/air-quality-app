@@ -1,6 +1,6 @@
 import { Prisma, type AnalyticsSummary } from "@prisma/client";
 import { prisma } from "../prisma.js";
-import { categoryFor, type AqiCategoryKey } from "../aqi.js";
+import { categoryFor, type AqiCategoryKey } from "./denr.js";
 import { POLLUTANT_KEYS, POLLUTANTS, pollutantIndex, type PollutantKey } from "./pollutants.js";
 import { addZonedDays, HOUR_MS, startOfZonedDay, zonedDateKey, zonedHour } from "./time.js";
 import { indexHours, isRepresentativeDay, maxRunning8h, windowStats } from "./windows.js";

@@ -1,6 +1,6 @@
 import { Prisma, type HourlyAverage, type PollutionEvent } from "@prisma/client";
 import { prisma } from "../prisma.js";
-import { CATEGORIES, categoryFor } from "../aqi.js";
+import { CATEGORIES, categoryFor } from "./denr.js";
 import { explainCauses } from "./analysis.js";
 import { dailyDetails, loadDailySummaries, type DailyDetails } from "./daily.js";
 import {

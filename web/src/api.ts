@@ -123,17 +123,16 @@ export type TransmissionHistoryResponse = {
   rows: TransmissionRow[];
 };
 
-/** DENR-EMB AQI. Only PM2.5, PM10 and SO2 set `aqi`; CO is estimated and NO2 has no breakpoints. */
 export type AqiResult = {
   aqi: number;
   category: string;
   color: string;
-  dominantPollutant: "pm25" | "pm10" | "so2";
-  pm25SubIndex: number | null;
-  pm10SubIndex: number | null;
-  coSubIndex: number | null;
-  no2SubIndex: null;
-  so2SubIndex: number | null;
+  dominantPollutant: "pm25" | "pm10" | "co" | "no2" | "so2";
+  pm25SubIndex: number;
+  pm10SubIndex: number;
+  coSubIndex: number;
+  no2SubIndex: number;
+  so2SubIndex: number;
 };
 
 const API_URL = resolveApiBaseUrl();

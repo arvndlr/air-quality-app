@@ -4,7 +4,7 @@ import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { env } from "../env.js";
 import { asyncHandler } from "../async-handler.js";
-import { CATEGORIES } from "../aqi.js";
+import { CATEGORIES } from "../analytics/denr.js";
 import { buildOverview, eventDto, rollingWindows } from "../analytics/overview.js";
 import { countDeletable, deleteReadings } from "../analytics/retention.js";
 import { refreshDevice, retentionState, runCycle, schedulerState } from "../analytics/scheduler.js";

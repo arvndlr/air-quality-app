@@ -1,3 +1,26 @@
+import { AQI_CATEGORIES } from "../aqiScale";
+
+// DAO 2000-81 cautionary statements for each DENR AQI category.
+const cautionary: Record<string, string> = {
+  good: "None.",
+  fair: "None.",
+  usg: "People with respiratory disease, such as asthma, should limit outdoor exertion.",
+  "very-unhealthy":
+    "Pedestrians should avoid heavy traffic areas. People with heart or respiratory disease such as asthma should stay indoors and rest as much as possible. Unnecessary trips should be postponed. People should voluntarily restrict the use of vehicles.",
+  "acutely-unhealthy":
+    "People should limit outdoor exertion. People with heart or respiratory disease such as asthma should stay indoors and rest as much as possible. Unnecessary trips should be postponed. Motor vehicle use may be restricted. Industrial activities may be curtailed.",
+  emergency:
+    "Everyone should remain indoors (keeping windows and doors closed unless heat stress is possible). Motor vehicle use should be prohibited except for emergency situations. Industrial activities, except those vital for public safety and health, should be curtailed."
+};
+
+// DENR-EMB Table 5.2-2 breakpoints, in category order (Good to Emergency).
+const breakpoints = [
+  { pollutant: "PM2.5", averaging: "24-hour", unit: "\u00b5g/Ncm", ranges: ["0-25", "25.1-35.0", "35.1-45.0", "45.1-55", "55.1-90", "91+"] },
+  { pollutant: "PM10", averaging: "24-hour", unit: "\u00b5g/Ncm", ranges: ["0-54", "55-154", "155-254", "255-354", "355-424", "425-504"] },
+  { pollutant: "SO2", averaging: "24-hour", unit: "ppm", ranges: ["0.000-0.034", "0.035-0.144", "0.145-0.224", "0.225-0.304", "0.305-0.604", "0.605-0.804"] },
+  { pollutant: "CO", averaging: "8-hour", unit: "ppm", ranges: ["0.0-4.4", "4.5-9.4", "9.5-12.4", "12.5-15.4", "15.5-30.4", "30.5-40.4"] }
+];
+
 export function AqiInfo() {
   return (
     <div className="page info-page">
@@ -6,106 +29,121 @@ export function AqiInfo() {
       <section className="info-section">
         <h2>What is AQI?</h2>
         <p>
-          The <strong>Air Quality Index (AQI)</strong> is a standardized scale used by the U.S. Environmental
-          Protection Agency (EPA) to communicate how polluted the air currently is or how polluted it is forecast
-          to become. It runs from <strong>0 to 500</strong>; the higher the value, the greater the level of air
-          pollution and the greater the health concern.
+          The <strong>Air Quality Index (AQI)</strong> is a simple, colour-coded, unitless index that communicates how
+          polluted the air is and what it means for health. This system uses the Philippine AQI from the{" "}
+          <strong>DENR Environmental Management Bureau</strong> (Procedural Manual on Data Handling Conventions for
+          Criteria Air Pollutants, 2021). It runs from <strong>0 to 500</strong>; the higher the value, the greater the
+          health concern.
         </p>
         <p>
-          An AQI value of 100 generally corresponds to the national air quality standard for the pollutant, which
-          is the level the EPA has set to protect public health. Values below 100 are generally considered
-          satisfactory. When AQI values exceed 100, air quality is considered unhealthy, first for certain
-          sensitive groups of people, then for everyone as values climb higher.
+          The AQI is based on averages, not single readings: 24-hour averages for PM2.5, PM10 and SO2, and 8-hour
+          averages for CO. An average is only representative with at least 75% data capture (for example 18 of 24 hours,
+          each with at least 45 minutes of readings). The live dashboard shows the latest reading as a real-time
+          indication; the Analytics page shows the official averages.
         </p>
       </section>
 
       <section className="info-section">
         <h2>AQI Categories</h2>
-        <p>The EPA defines six levels of health concern:</p>
+        <p>DENR-EMB defines six categories, each with a cautionary statement:</p>
         <div className="aqi-table-wrapper">
           <table className="aqi-table">
             <thead>
               <tr>
                 <th>AQI Range</th>
                 <th>Category</th>
-                <th>Health Implications</th>
+                <th>Cautionary statement</th>
               </tr>
             </thead>
             <tbody>
-              <tr style={{ borderLeft: "4px solid #00e400" }}>
-                <td><strong>0 - 50</strong></td>
-                <td>Good</td>
-                <td>Air quality is satisfactory, and air pollution poses little or no risk.</td>
-              </tr>
-              <tr style={{ borderLeft: "4px solid #ffff00" }}>
-                <td><strong>51 - 100</strong></td>
-                <td>Moderate</td>
-                <td>
-                  Air quality is acceptable. However, there may be a risk for some people, particularly those who
-                  are unusually sensitive to air pollution.
-                </td>
-              </tr>
-              <tr style={{ borderLeft: "4px solid #ff7e00" }}>
-                <td><strong>101 - 150</strong></td>
-                <td>Unhealthy for Sensitive Groups</td>
-                <td>
-                  Members of sensitive groups may experience health effects. The general public is less likely to
-                  be affected.
-                </td>
-              </tr>
-              <tr style={{ borderLeft: "4px solid #ff0000" }}>
-                <td><strong>151 - 200</strong></td>
-                <td>Unhealthy</td>
-                <td>
-                  Some members of the general public may experience health effects; members of sensitive groups
-                  may experience more serious health effects.
-                </td>
-              </tr>
-              <tr style={{ borderLeft: "4px solid #8f3f97" }}>
-                <td><strong>201 - 300</strong></td>
-                <td>Very Unhealthy</td>
-                <td>Health alert: the risk of health effects is increased for everyone.</td>
-              </tr>
-              <tr style={{ borderLeft: "4px solid #7e0023" }}>
-                <td><strong>301 - 500</strong></td>
-                <td>Hazardous</td>
-                <td>
-                  Health warning of emergency conditions: everyone is more likely to be affected.
-                </td>
-              </tr>
+              {AQI_CATEGORIES.map((c) => (
+                <tr key={c.key} style={{ borderLeft: "4px solid " + c.color }}>
+                  <td>
+                    <strong>
+                      {c.min} - {c.max}
+                    </strong>
+                  </td>
+                  <td>{c.label}</td>
+                  <td>{cautionary[c.key]}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       </section>
 
       <section className="info-section">
+        <h2>Breakpoints</h2>
+        <div className="aqi-table-wrapper">
+          <table className="aqi-table">
+            <thead>
+              <tr>
+                <th>Pollutant</th>
+                {AQI_CATEGORIES.map((c) => (
+                  <th key={c.key} style={{ borderBottom: "3px solid " + c.color }}>
+                    {c.short}
+                    <br />
+                    <small>
+                      {c.min}-{c.max}
+                    </small>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {breakpoints.map((b) => (
+                <tr key={b.pollutant}>
+                  <td>
+                    <strong>{b.pollutant}</strong>
+                    <br />
+                    <small>
+                      {b.averaging}, {b.unit}
+                    </small>
+                  </td>
+                  {b.ranges.map((r) => (
+                    <td key={r}>{r}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p>
+          DENR defines no AQI breakpoints for NO2. It is compared with the 24-hour guideline value of 150 &micro;g/Ncm (80
+          ppb) instead. The manual gives no upper end for the PM2.5 Emergency band; this system reaches 500 at 250
+          &micro;g/Ncm.
+        </p>
+      </section>
+
+      <section className="info-section">
         <h2>How is AQI Calculated?</h2>
         <p>
-          The AQI is calculated for each criteria pollutant independently using EPA-defined <strong>breakpoint
-          tables</strong>. Each pollutant has a set of concentration ranges that map to AQI ranges.
+          For an average concentration <em>Cp</em>, the sub-index is found by <strong>linear interpolation</strong>{" "}
+          between the two breakpoints that bracket it:
         </p>
-        <p>
-          For a given pollutant concentration <em>C</em>, the sub-index is computed using <strong>linear
-          interpolation</strong> between the two nearest breakpoints:
-        </p>
-        <div className="formula-block">I = ((I_high - I_low) / (C_high - C_low)) x (C - C_low) + I_low</div>
+        <div className="formula-block">Ip = ((I_Hi - I_Lo) / (BP_Hi - BP_Lo)) x (Cp - BP_Lo) + I_Lo</div>
         <p>Where:</p>
         <ul>
-          <li><strong>C</strong> = the pollutant concentration (truncated to the breakpoint precision)</li>
-          <li><strong>C_low / C_high</strong> = the concentration breakpoints surrounding C</li>
-          <li><strong>I_low / I_high</strong> = the corresponding AQI breakpoints</li>
+          <li><strong>Cp</strong> = the average concentration, truncated (PM2.5 to 0.1, PM10 to 1, SO2 to 0.001 ppm, CO to 0.1 ppm)</li>
+          <li><strong>BP_Lo / BP_Hi</strong> = the concentration breakpoints that bracket Cp</li>
+          <li><strong>I_Lo / I_Hi</strong> = the AQI values at those breakpoints</li>
         </ul>
         <p>
-          The <strong>overall AQI</strong> is the <strong>maximum</strong> of all individual sub-indices. The
-          pollutant that produces the highest sub-index is the <strong>dominant pollutant</strong>.
+          Example from the manual: a 24-hour PM10 average of 210 &micro;g/Ncm gives (150 - 101) / (254 - 155) x (210 -
+          155) + 101 = <strong>128</strong> (Unhealthy for Sensitive Groups).
+        </p>
+        <p>
+          The <strong>overall AQI</strong> is the highest sub-index among PM2.5, PM10 and SO2, and that pollutant is the{" "}
+          <strong>dominant pollutant</strong>. CO and NO2 come from the uncalibrated MiCS-6814 sensor, so they are shown
+          as estimates and do not set the overall AQI.
         </p>
       </section>
 
       <section className="info-section">
         <h2>Pollutants We Measure</h2>
         <p>
-          Our system monitors <strong>five EPA criteria pollutants</strong> that have official AQI breakpoint
-          tables, plus additional gases and environmental indicators:
+          Our system monitors <strong>five criteria pollutants</strong> covered by the Philippine Clean Air Act, plus
+          additional gases and environmental indicators:
         </p>
         <div className="pollutant-grid">
           <div className="pollutant-card">
@@ -163,7 +201,7 @@ export function AqiInfo() {
             <h3>CO2</h3>
             <p className="pollutant-detail">Carbon Dioxide</p>
             <p>
-              CO2 is <strong>not</strong> an EPA criteria pollutant and has no AQI breakpoints. However, indoor
+              CO2 is <strong>not</strong> a criteria pollutant and has no AQI breakpoints. However, indoor
               CO2 levels are an excellent proxy for ventilation quality. Levels above 1,000 ppm often indicate
               poor ventilation and can cause drowsiness and reduced cognitive function.
             </p>
@@ -176,7 +214,7 @@ export function AqiInfo() {
             <h3>NH3</h3>
             <p className="pollutant-detail">Ammonia</p>
             <p>
-              NH3 has no EPA AQI breakpoint table. It is monitored as a supplementary indicator; elevated ammonia
+              NH3 has no DENR AQI breakpoint table. It is monitored as a supplementary indicator; elevated ammonia
               can signal nearby agricultural activity, waste processing, or chemical leaks.
             </p>
             <div className="pollutant-meta">

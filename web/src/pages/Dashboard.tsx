@@ -9,6 +9,7 @@ import { formatDurationCompact, formatResetReason, getSo2StatusSummary, isMeasur
 import { AqiCard } from "../components/AqiCard";
 import { PollutantCard } from "../components/PollutantCard";
 import { useDeviceWebSocket } from "../useWebSocket";
+import { displayDeviceName } from "../deviceNames";
 type RangeKey = "day" | "week" | "month" | "year";
 
 const ranges: Array<{ key: RangeKey; label: string }> = [
@@ -185,7 +186,7 @@ export function Dashboard() {
             <option value="" disabled>{devices.length === 0 ? "No devices registered" : "Select device..."}</option>
             {devices.map((d) => (
               <option key={d.externalId} value={d.externalId}>
-                {d.name ? `${d.name} (${d.externalId})` : d.externalId}
+                {displayDeviceName(d.externalId, d.name)}
               </option>
             ))}
           </select>

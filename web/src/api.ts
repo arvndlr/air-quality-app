@@ -1,4 +1,4 @@
-import { displayDeviceName } from "./deviceNames";
+import { displayDeviceName, replaceDeviceNames } from "./deviceNames";
 import { resolveApiBaseUrl } from "./runtimeUrls";
 
 export type Device = {
@@ -240,9 +240,12 @@ export async function downloadTransmissionCsv(
   const res = await fetch(url);
   if (!res.ok) throw new Error("Failed to export the transmission log");
 
-  const blob = await res.blob();
+  // The API writes stored station names and IDs; show only the unit names.
+  const blob = new Blob([replaceDeviceNames(await res.text())], { type: "text/csv;charset=utf-8" });
   const objectUrl = URL.createObjectURL(blob);
-  const scope = params.deviceId ? params.deviceId.replace(/[^a-zA-Z0-9_-]/g, "-") : "all-devices";
+  const scope = params.deviceId
+    ? displayDeviceName(params.deviceId).replace(/[^a-zA-Z0-9_-]/g, "-")
+    : "all-devices";
   const stamp = (value: string) => value.slice(0, 19).replace(/[:T]/g, "-");
 
   const link = document.createElement("a");

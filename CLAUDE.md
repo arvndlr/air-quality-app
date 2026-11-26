@@ -62,6 +62,7 @@ Routes (all under `/api/v1`):
 | `GET /latest?deviceId=` | Newest measurement + AQI. |
 | `GET /series?deviceId&metric&from&to&bucket` | avg/min/max per time bucket using raw SQL (`date_trunc` / `date_bin` for `5min`/`15min`). `metric` must be a key of the whitelist in [series.ts](api/src/routes/series.ts). |
 | `GET /transmissions` and `/transmissions/export` | Transmission history, gap detection (`LAG`), daily rollups in the browser's `timeZone`, and CSV export (capped at 20000 rows). `transmissionStatus` is derived from `so2Status`/`so2Ppb` (`warming`/`calibrating`/`ready`/`unknown`). |
+| `GET /analytics/summary?deviceId&period` | Rolling-window averages and AQI for `1h`/`8h`/`24h`/`annual`, aggregated in SQL ([analytics-engine.ts](api/src/analytics-engine.ts)). The AQI is only reported when coverage reaches 75% of the expected samples (one every 10 s). Each result is upserted into `AnalyticsSummary`, keyed by the minute-aligned window. `PollutionEvent` and `AnalyticsRun` exist in the schema but nothing writes them yet. |
 | `GET /healthz` | Health check (outside `/api/v1`). |
 
 Only `/ingest` is authenticated. The read endpoints are public.

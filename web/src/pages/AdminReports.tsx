@@ -1,3 +1,4 @@
+import { displayDeviceName } from "../deviceNames";
 import { useEffect, useMemo, useState } from "react";
 import { format, formatDistanceToNowStrict, formatISO, parseISO } from "date-fns";
 import { getBatteryStatus } from "../battery";
@@ -222,7 +223,7 @@ export function AdminReports() {
             <option value="">All devices</option>
             {devices.map((device) => (
               <option key={device.externalId} value={device.externalId}>
-                {device.name ? `${device.name} (${device.externalId})` : device.externalId}
+                {displayDeviceName(device.externalId, device.name)}
               </option>
             ))}
           </select>
@@ -426,8 +427,7 @@ export function AdminReports() {
                         <tr key={snapshot.device.externalId}>
                           <td>
                             <div className="report-cell-stack">
-                              <strong>{snapshot.device.name ?? snapshot.device.externalId}</strong>
-                              <span>{snapshot.device.externalId}</span>
+                              <strong>{displayDeviceName(snapshot.device.externalId, snapshot.device.name)}</strong>
                             </div>
                           </td>
                           <td>
@@ -609,8 +609,7 @@ export function AdminReports() {
                         </td>
                         <td>
                           <div className="report-cell-stack">
-                            <strong>{row.deviceName ?? row.deviceExternalId}</strong>
-                            <span>{row.deviceExternalId}</span>
+                            <strong>{displayDeviceName(row.deviceExternalId, row.deviceName)}</strong>
                           </div>
                         </td>
                         <td>

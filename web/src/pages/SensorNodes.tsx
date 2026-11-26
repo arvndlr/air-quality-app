@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { getLatest, listDevices, type AqiResult, type Device, type Measurement } from "../api";
 import { getBatteryStatus } from "../battery";
 import { formatDurationCompact, formatResetReason, getSo2StatusSummary, isMeasurementOnline } from "../deviceStatus";
+import { displayDeviceName, unitParam } from "../deviceNames";
 
 type NodeStatus = {
   device: Device;
@@ -97,19 +98,18 @@ export function SensorNodes() {
             <Link
               key={n.device.externalId}
               className="sensor-node-card sensor-node-card--interactive"
-              to={`/admin?deviceId=${encodeURIComponent(n.device.externalId)}`}
+              to={`/admin?unit=${encodeURIComponent(unitParam(n.device.externalId))}`}
             >
               <div className="sensor-node-card__header">
                 <div className="sensor-node-card__name">
                   <StatusDot online={online} />
-                  <span>{n.device.name ?? n.device.externalId}</span>
+                  <span>{displayDeviceName(n.device.externalId, n.device.name)}</span>
                 </div>
                 <span className={`sensor-node-card__status ${online ? "sensor-node-card__status--online" : "sensor-node-card__status--offline"}`}>
                   {online ? "Online" : "Offline"}
                 </span>
               </div>
 
-              <div className="sensor-node-card__id">{n.device.externalId}</div>
 
               {n.loading ? (
                 <div className="sensor-node-card__loading">Loading...</div>

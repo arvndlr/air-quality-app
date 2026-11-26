@@ -28,6 +28,7 @@ import {
 } from "../api";
 import { AQI_CATEGORIES, categoryByKey, categoryForIndex } from "../aqiScale";
 import { toDateInputValue } from "../reportRange";
+import { displayDeviceName } from "../deviceNames";
 
 type RangeKey = "1d" | "3d" | "7d" | "30d" | "custom";
 
@@ -880,7 +881,7 @@ function DataManagement({ devices }: { devices: Device[] }) {
     const label = maxCategory === "good" ? "Good" : "Good and Fair";
     const ok = window.confirm(
       `Permanently delete up to ${preview.toLocaleString("en-US")} raw ${label} readings from ${from || "the beginning"} to ${to}${
-        deviceId ? ` for ${deviceId}` : " for all stations"
+        deviceId ? ` for ${displayDeviceName(deviceId)}` : " for all stations"
       }?\n\nHourly and daily averages, events and elevated readings are kept. This cannot be undone.`
     );
     if (!ok) return;
@@ -966,7 +967,7 @@ function DataManagement({ devices }: { devices: Device[] }) {
                       <td>{fmtDateTime(d.createdAt)}</td>
                       <td>{d.mode === "auto" ? "Automatic" : "Manual"}</td>
                       <td>
-                        {d.deviceId ?? "All stations"} · up to {d.maxCategory === "good" ? "Good" : "Fair"} · before{" "}
+                        {d.deviceId ? displayDeviceName(d.deviceId) : "All stations"} · up to {d.maxCategory === "good" ? "Good" : "Fair"} · before{" "}
                         {format(new Date(d.rangeTo), "MMM d, yyyy")}
                       </td>
                       <td>{d.deletedCount.toLocaleString("en-US")}</td>
@@ -988,7 +989,7 @@ function DataManagement({ devices }: { devices: Device[] }) {
               <option value="">All stations</option>
               {devices.map((d) => (
                 <option key={d.externalId} value={d.externalId}>
-                  {d.name ?? d.externalId}
+                  {displayDeviceName(d.externalId, d.name)}
                 </option>
               ))}
             </select>
@@ -1094,7 +1095,7 @@ function exportCsv(data: AnalyticsOverview) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `analytics-${data.device.externalId}-${data.range.from.slice(0, 10)}_to_${data.range.to.slice(0, 10)}.csv`;
+  link.download = `analytics-${displayDeviceName(data.device.externalId, data.device.name).replace(/\s+/g, "-")}-${data.range.from.slice(0, 10)}_to_${data.range.to.slice(0, 10)}.csv`;
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -1189,7 +1190,7 @@ export function Analytics() {
           <select value={deviceId} onChange={(e) => setDeviceId(e.target.value)}>
             {devices.map((d) => (
               <option key={d.externalId} value={d.externalId}>
-                {d.name ? `${d.name} (${d.externalId})` : d.externalId}
+                {displayDeviceName(d.externalId, d.name)}
               </option>
             ))}
           </select>

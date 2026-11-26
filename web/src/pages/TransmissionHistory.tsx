@@ -1,3 +1,4 @@
+import { displayDeviceName } from "../deviceNames";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { format, formatDistanceToNowStrict, formatISO, parseISO } from "date-fns";
 import {
@@ -248,7 +249,7 @@ export function TransmissionHistory() {
               <option value="">All devices</option>
               {devices.map((device) => (
                 <option key={device.externalId} value={device.externalId}>
-                  {device.name ? `${device.name} (${device.externalId})` : device.externalId}
+                  {displayDeviceName(device.externalId, device.name)}
                 </option>
               ))}
             </select>
@@ -554,8 +555,7 @@ export function TransmissionHistory() {
                         </td>
                         <td>
                           <div className="history-cell-stack">
-                            <strong>{row.deviceName ?? row.deviceExternalId}</strong>
-                            <span>{row.deviceExternalId}</span>
+                            <strong>{displayDeviceName(row.deviceExternalId, row.deviceName)}</strong>
                           </div>
                         </td>
                         <td>

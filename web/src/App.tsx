@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AdminLayout } from "./components/AdminLayout";
 import { RequireAdminAuth } from "./components/RequireAdminAuth";
 import { AdminLogin } from "./pages/AdminLogin";
+import { Analytics } from "./pages/Analytics";
 import { AqiInfo } from "./pages/AqiInfo";
 import { AdminReports } from "./pages/AdminReports";
 import { Dashboard } from "./pages/Dashboard";
@@ -19,6 +20,7 @@ export function App() {
         <Route element={<RequireAdminAuth />}>
           <Route element={<AdminLayout />} path="/admin">
             <Route index element={<Dashboard />} />
+            <Route element={<Analytics />} path="analytics" />
             <Route element={<SensorNodes />} path="sensor-nodes" />
             <Route element={<AqiInfo />} path="aqi-guide" />
             <Route element={<TransmissionHistory />} path="transmission-history" />
@@ -27,6 +29,7 @@ export function App() {
         </Route>
 
         <Route element={<Navigate replace to="/admin" />} path="/dashboard" />
+        <Route element={<Navigate replace to="/admin/analytics" />} path="/analytics" />
         <Route element={<Navigate replace to="/admin/sensor-nodes" />} path="/sensor-nodes" />
         <Route element={<Navigate replace to="/admin/aqi-guide" />} path="/aqi-guide" />
         <Route element={<Navigate replace to="/admin/transmission-history" />} path="/transmission-history" />

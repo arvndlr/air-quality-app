@@ -70,6 +70,7 @@ model PollutionEvent {
 
   device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
 
+  @@unique([deviceId, pollutant, startedAt])
   @@index([deviceId, startedAt])
   @@index([deviceId, pollutant, status])
   @@index([severity, startedAt])
@@ -105,6 +106,7 @@ model Device {
   analyticsSummaries AnalyticsSummary[]
   pollutionEvents    PollutionEvent[]
   analyticsRuns      AnalyticsRun[]
+  hourlyAverages     HourlyAverage[]
 
   @@index([externalId])
 }
@@ -155,4 +157,64 @@ model Measurement {
 
   @@index([deviceId, ts(sort: Desc)])
   @@index([ts(sort: Desc)])
+}
+
+/// Permanent hourly rollup of Measurement. Raw "Good" readings are purged after the
+/// retention period, so daily and annual analytics are always computed from these rows.
+model HourlyAverage {
+  deviceId    String
+  hourStart   DateTime @db.Timestamptz(6)
+  sampleCount Int      @default(0)
+  /// Set once the hour is closed; finalized rows are never recomputed from raw data.
+  finalized   Boolean  @default(false)
+
+  pm25Avg     Float?
+  pm25Max     Float?
+  pm25Minutes Int    @default(0)
+  pm10Avg     Float?
+  pm10Max     Float?
+  pm10Minutes Int    @default(0)
+  so2Avg      Float?
+  so2Max      Float?
+  so2Minutes  Int    @default(0)
+  coAvg       Float?
+  coMax       Float?
+  coMinutes   Int    @default(0)
+  no2Avg      Float?
+  no2Max      Float?
+  no2Minutes  Int    @default(0)
+  co2Avg      Float?
+  co2Max      Float?
+  co2Minutes  Int    @default(0)
+  vocAvg      Float?
+  vocMax      Float?
+  vocMinutes  Int    @default(0)
+  nh3Avg      Float?
+  nh3Max      Float?
+  nh3Minutes  Int    @default(0)
+
+  tempCAvg Float?
+  rhAvg    Float?
+
+  updatedAt DateTime @updatedAt
+
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@id([deviceId, hourStart])
+  @@index([hourStart])
+}
+
+/// Audit trail for raw readings removed by the retention job or by an admin.
+model DataDeletionLog {
+  id           Int       @id @default(autoincrement())
+  createdAt    DateTime  @default(now()) @db.Timestamptz(6)
+  mode         String
+  deviceId     String?
+  rangeFrom    DateTime? @db.Timestamptz(6)
+  rangeTo      DateTime  @db.Timestamptz(6)
+  maxCategory  String
+  deletedCount Int
+  note         String?
+
+  @@index([createdAt])
 }

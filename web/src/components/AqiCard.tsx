@@ -1,4 +1,5 @@
 import type { AqiResult } from "../api";
+import { AQI_SCALE_TEXT, categoryColor } from "../aqiScale";
 
 const pollutantLabels: Record<string, string> = {
   pm25: "PM\u2082.\u2085",
@@ -8,22 +9,16 @@ const pollutantLabels: Record<string, string> = {
   so2: "SO\u2082",
 };
 
-const categoryColors: Record<string, string> = {
-  Good: "#00e400",
-  Moderate: "#ffff00",
-  "Unhealthy for Sensitive Groups": "#ff7e00",
-  Unhealthy: "#ff0000",
-  "Very Unhealthy": "#8f3f97",
-  Hazardous: "#7e0023",
-};
-
+// DENR-EMB cautionary statements (DAO 2000-81) for each category.
 const healthMessages: Record<string, string> = {
   Good: "Air quality is satisfactory. Enjoy outdoor activities.",
-  Moderate: "Sensitive individuals may consider limiting prolonged outdoor exertion.",
-  "Unhealthy for Sensitive Groups": "People with respiratory conditions should reduce outdoor activity.",
-  Unhealthy: "Everyone may begin to experience health effects. Limit outdoor exertion.",
-  "Very Unhealthy": "Health alert: everyone may experience serious health effects.",
-  Hazardous: "Health warning of emergency conditions. Avoid all outdoor activity.",
+  Fair: "Air quality is acceptable. Unusually sensitive people may limit prolonged outdoor exertion.",
+  "Unhealthy for Sensitive Groups": "People with respiratory disease, such as asthma, should limit outdoor exertion.",
+  "Very Unhealthy":
+    "Avoid heavy traffic areas. People with heart or respiratory disease should stay indoors and rest. Postpone unnecessary trips.",
+  "Acutely Unhealthy":
+    "Limit outdoor exertion. People with heart or respiratory disease should stay indoors. Vehicle use and industrial activity may be restricted.",
+  Emergency: "Everyone should remain indoors with windows and doors closed. Vehicle use should be limited to emergencies.",
 };
 
 export function AqiCard(props: {
@@ -38,7 +33,7 @@ export function AqiCard(props: {
   const category = aqi?.category ?? "No data";
   const color = aqi?.color ?? "transparent";
   const dominant = aqi ? pollutantLabels[aqi.dominantPollutant] ?? aqi.dominantPollutant : null;
-  const badgeColor = categoryColors[category] ?? "#888";
+  const badgeColor = categoryColor(category);
   const healthMsg = healthMessages[category] ?? "";
 
   return (
@@ -73,9 +68,7 @@ export function AqiCard(props: {
       </div>
 
       <div className="aqi-hero__scale">
-        AQI scale: 0–50 Good · 51–100 Moderate · 101–150
-        Unhealthy for Sensitive Groups · 151–200 Unhealthy ·
-        201–300 Very Unhealthy · 301+ Hazardous
+        DENR AQI scale: {AQI_SCALE_TEXT}
       </div>
 
       {healthMsg && (
@@ -91,11 +84,10 @@ export function AqiCard(props: {
           {[
             { key: "pm25", label: "PM\u2082.\u2085", value: aqi.pm25SubIndex },
             { key: "pm10", label: "PM\u2081\u2080", value: aqi.pm10SubIndex },
-            { key: "co", label: "CO", value: aqi.coSubIndex },
-            { key: "no2", label: "NO\u2082", value: aqi.no2SubIndex },
             { key: "so2", label: "SO\u2082", value: aqi.so2SubIndex },
+            { key: "co", label: "CO (estimated)", value: aqi.coSubIndex },
           ]
-            .filter((s) => s.value > 0)
+            .filter((s) => s.value != null && s.value > 0)
             .map((s) => (
               <div key={s.key} className="aqi-breakdown__row">
                 <span className="aqi-breakdown__label">{s.label}</span>

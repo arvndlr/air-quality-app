@@ -3,6 +3,7 @@ import { getAdminSession, signOutAdmin } from "../auth";
 
 const navItems = [
   { to: "/admin", label: "AQI Dashboard", icon: "AQI" },
+  { to: "/admin/analytics", label: "Analytics", icon: "ANL" },
   { to: "/admin/sensor-nodes", label: "Sensor Nodes", icon: "SNS" },
   { to: "/admin/aqi-guide", label: "Pollutant Info", icon: "INF" },
   { to: "/admin/transmission-history", label: "Transmission History", icon: "LOG" },

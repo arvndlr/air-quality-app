@@ -11,6 +11,7 @@ import { latestRouter } from "./routes/latest.js";
 import { devicesRouter } from "./routes/devices.js";
 import { transmissionsRouter } from "./routes/transmissions.js";
 import { analyticsRouter } from "./routes/analytics.js";
+import { startAnalyticsScheduler } from "./analytics/scheduler.js";
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));
@@ -77,4 +78,5 @@ wss.on("close", () => {
 server.listen(env.PORT, () => {
   // eslint-disable-next-line no-console
   console.log(`API listening on http://localhost:${env.PORT}`);
+  startAnalyticsScheduler();
 });

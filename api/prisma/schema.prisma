@@ -8,75 +8,67 @@ datasource db {
 }
 
 model AnalyticsSummary {
-  id                Int      @id @default(autoincrement())
-  deviceId          String
-  period            String
-  windowStart       DateTime @db.Timestamptz(6)
-  windowEnd         DateTime @db.Timestamptz(6)
-  computedAt        DateTime @default(now()) @db.Timestamptz(6)
+  id          Int      @id @default(autoincrement())
+  deviceId    String
+  period      String
+  windowStart DateTime @db.Timestamptz(6)
+  windowEnd   DateTime @db.Timestamptz(6)
+  computedAt  DateTime @default(now()) @db.Timestamptz(6)
 
-  sampleCount       Int      @default(0)
-  coveragePct       Float    @default(0)
-  isValid           Boolean  @default(false)
+  sampleCount Int     @default(0)
+  coveragePct Float   @default(0)
+  isValid     Boolean @default(false)
 
-  avgPm25           Float?
-  avgPm10           Float?
-  avgCO             Float?
-  avgCO2            Float?
-  avgNO2            Float?
-  avgSO2            Float?
+  avgPm25 Float?
+  avgPm10 Float?
+  avgCO   Float?
+  avgCO2  Float?
+  avgNO2  Float?
+  avgSO2  Float?
 
   aqi               Int?
   category          String?
   dominantPollutant String?
   pollutantDetails  Json?
 
-  device Device @relation(
-    fields: [deviceId],
-    references: [id],
-    onDelete: Cascade
-  )
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
 
   @@unique([deviceId, period, windowStart])
   @@index([deviceId, period, windowEnd])
 }
 
 model PollutionEvent {
-  id             Int      @id @default(autoincrement())
-  deviceId       String
+  id       Int    @id @default(autoincrement())
+  deviceId String
 
-  pollutant      String
-  severity       String
-  status         String   @default("ACTIVE")
+  pollutant String
+  severity  String
+  status    String @default("ACTIVE")
 
-  startedAt      DateTime @db.Timestamptz(6)
-  lastSeenAt     DateTime @db.Timestamptz(6)
-  endedAt        DateTime? @db.Timestamptz(6)
+  startedAt  DateTime  @db.Timestamptz(6)
+  lastSeenAt DateTime  @db.Timestamptz(6)
+  endedAt    DateTime? @db.Timestamptz(6)
 
   peakValue      Float?
   averageValue   Float?
   thresholdValue Float?
   unit           String?
 
-  consecutiveDays Int     @default(0)
+  consecutiveDays Int @default(0)
 
-  title           String
-  description     String
+  title       String
+  description String
 
-  possibleCauses   Json?
-  healthEffects    Json?
-  affectedGroups   Json?
+  possibleCauses  Json?
+  healthEffects   Json?
+  affectedGroups  Json?
   recommendations Json?
-  evidence         Json?
+  evidence        Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  device Device @relation(
-    fields: [deviceId],
-    references: [id],
-    onDelete: Cascade
-  )
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
 
   @@index([deviceId, startedAt])
   @@index([deviceId, pollutant, status])
@@ -84,34 +76,30 @@ model PollutionEvent {
 }
 
 model AnalyticsRun {
-  id               Int      @id @default(autoincrement())
-  deviceId         String
+  id       Int    @id @default(autoincrement())
+  deviceId String
 
-  startedAt        DateTime @default(now())
-  completedAt      DateTime?
-  status           String   @default("RUNNING")
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  status      String    @default("RUNNING")
 
-  windowsProcessed Int      @default(0)
-  eventsDetected   Int      @default(0)
+  windowsProcessed Int     @default(0)
+  eventsDetected   Int     @default(0)
   errorMessage     String?
 
-  device Device @relation(
-    fields: [deviceId],
-    references: [id],
-    onDelete: Cascade
-  )
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
 
   @@index([deviceId, startedAt])
   @@index([status])
 }
 
 model Device {
-  id         String        @id @default(uuid())
-  externalId String        @unique
+  id         String   @id @default(uuid())
+  externalId String   @unique
   name       String?
   apiKeyHash String
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   samples            Measurement[]
   analyticsSummaries AnalyticsSummary[]
@@ -121,50 +109,49 @@ model Device {
   @@index([externalId])
 }
 
-
 model Measurement {
-  id           Int      @id @default(autoincrement())
-  deviceId     String
-  ts           DateTime @db.Timestamptz(6)
+  id       Int      @id @default(autoincrement())
+  deviceId String
+  ts       DateTime @db.Timestamptz(6)
 
-  tempC        Float?
-  rh           Float?
-  pressureHpa  Float?
-  gasKohm      Float?
-  vocIndex     Float?
-  batteryVoltage Float?
-  chargerOn    Boolean?
-  uptimeSec    Int?
-  bootCount    Int?
-  resetReason  String?
-  so2Status    String?
+  tempC                 Float?
+  rh                    Float?
+  pressureHpa           Float?
+  gasKohm               Float?
+  vocIndex              Float?
+  batteryVoltage        Float?
+  chargerOn             Boolean?
+  uptimeSec             Int?
+  bootCount             Int?
+  resetReason           String?
+  so2Status             String?
   so2WarmupRemainingSec Int?
   so2BaselineProgress   Int?
   so2BaselineTarget     Int?
 
-  co2ppm       Int?
-  scdTempC     Float?
-  scdRh        Float?
+  co2ppm   Int?
+  scdTempC Float?
+  scdRh    Float?
 
-  pm1ugm3      Float?
-  pm25ugm3     Float?
-  pm10ugm3     Float?
+  pm1ugm3  Float?
+  pm25ugm3 Float?
+  pm10ugm3 Float?
 
-  so2Vgas      Float?
-  so2Vref      Float?
-  so2Mv        Float?
+  so2Vgas Float?
+  so2Vref Float?
+  so2Mv   Float?
 
-  micsNh3V     Float?
-  micsCoV      Float?
-  micsNo2V     Float?
+  micsNh3V Float?
+  micsCoV  Float?
+  micsNo2V Float?
 
   // Estimated concentrations (computed on firmware from raw voltages)
-  so2Ppb       Float?
-  micsCoPpm    Float?
-  micsNo2Ppb   Float?
-  micsNh3Ppm   Float?
+  so2Ppb     Float?
+  micsCoPpm  Float?
+  micsNo2Ppb Float?
+  micsNh3Ppm Float?
 
-  device       Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
 
   @@index([deviceId, ts(sort: Desc)])
   @@index([ts(sort: Desc)])
